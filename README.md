@@ -1,5 +1,6 @@
-# MSM-acceleration-FPGA
+# MSM FPGA
 
+This is still a work in progress.
 Low level (VHDL) hardware description for MSM acceleration over FPGA.
 
 ## Repository contents
