@@ -1,0 +1,18 @@
+[tool.pyright]
+include = ["src"]
+exclude = ["**/node_modules",
+    "**/__pycache__",
+    "src/experimental",
+    "src/typestubs"
+]
+defineConstant = { DEBUG = true }
+
+reportMissingImports = true
+reportMissingTypeStubs = false
+
+pythonVersion = "3.10.9"
+pythonPlatform = "Linux"
+
+executionEnvironments = [
+  { root = "." }
+]
