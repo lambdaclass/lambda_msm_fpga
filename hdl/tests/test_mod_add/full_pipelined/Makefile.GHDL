@@ -1,0 +1,22 @@
+TOPLEVEL_LANG = vhdl
+SIM = ghdl
+
+VHDL_SOURCES += ../../../utils/tipos.vhd \
+				../../../utils/funciones.vhd \
+				../../../config.vhd \
+				../../../modules/mod_add/mod_add_pip.vhd
+
+TOPLEVEL=mod_add_pip
+
+EXTRA_ARGS= --ieee=synopsys -fexplicit --warn-no-binding --std=08
+
+MODULE := test_mod_add
+
+COCOTB=$(shell cocotb-config --makefiles)
+include $(COCOTB)/Makefile.sim
+
+
+GTK_SAVEFILE := $(wildcard sim_build/*.gtkw)
+
+gtkwave:
+	gtkwave sim_build/mod_add.ghw $(GTK_SAVEFILE) 
