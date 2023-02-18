@@ -17,4 +17,7 @@ So far the repository provides:
 * Questasim and/or [```GHDL```](https://github.com/ghdl/ghdl) and optionally [```GtkWave```](https://github.com/gtkwave/gtkwave) for waveform viewing
 
 ## Authors
-[AUTHORS.md](AUTHORS.md)
+* [Edgardo Marchi](https://github.com/edgardomarchi)
+* [Federico D'Angiolo](https://github.com/fgdangiolo)
+* [Marcos Cervetto](https://github.com/twint)
+* [Stefano Ruberto](https://github.com/stefmr)
