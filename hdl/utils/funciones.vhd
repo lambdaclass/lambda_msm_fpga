@@ -3,6 +3,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use IEEE.NUMERIC_STD.all;
 use work.TIPOS.all;
+use work.config.all;
 
 --* @brief Librería de funciones básicas
 package funciones is
@@ -41,12 +42,15 @@ package funciones is
    --* Devuelve el máximo entre dos naturals
   function get_partition(N : natural)
     return natural;
-  
+   --* Construye un elemento de tipo point_t
+  function to_point_t(V : std_logic_vector)
+    return point_t;
+        
+
 end package;
 
 
 package body funciones is
-
 ------------------------------------------------------------------------
 
   function ceil2power(N : natural) return natural is
@@ -595,5 +599,25 @@ begin
 end max;
 
 ------------------------------------------------------------------------  
+
+  function to_point_t(V : std_logic_vector) return point_t is
+
+    variable x, y, z : std_logic_vector(N_vect - 1 downto 0);
+    variable p : point_t(2 downto 0);
+  begin
+    x := V(N_vect - 1 downto 0);
+    y := V(2*N_vect - 1 downto N_vect);
+    z := (others => '0');
+    z(0) := '1';
+
+    p(0) := x;
+    p(1) := y;
+    p(2) := z;
+
+    return p;
+end to_point_t;
+
+
+------------------------------------------------------------------------
 
 end package body;

@@ -9,12 +9,13 @@ entity FSM_L1_busIn is
                 -- INPUT SIGNALS --
                 -------------------
                 clk, rst        : in std_logic;
-                start           : in std_logic;
+                start_A         : in std_logic;
+                start_B         : in std_logic;
 
                 --------------------
                 -- OUTPUT SIGNALS --
                 --------------------
-                scalar_out      : out std_logic;  -- For the FSM-dispatch
+--                scalar_out      : out std_logic;  -- For the FSM-dispatch
                 new_processing  : out std_logic;  -- For the counter
                 mem_enable_in   : out std_logic_vector(K - 1 downto 0)
             );
@@ -34,13 +35,13 @@ begin
                 end if;
         end process;
 
-        process(state_reg, start)
+        process(state_reg, start_A, start_B)
         begin
                 state_next <= state_reg;
 
                 case state_reg is
                         when s0_idle =>
-                                state_next <= s1_busIn when start = '1' else
+                                state_next <= s1_busIn when start_A = '1' or start_B = '1' else
                                               s0_idle;
                         when s1_busIn =>
                                 state_next <= s0_idle;
@@ -50,13 +51,13 @@ begin
         process(state_reg)
         begin
                 new_processing <= '0';
-                scalar_out <= '0';
+ --               scalar_out <= '0';
                 mem_enable_in <= (others => '0');
 
                 case state_reg is
                         when s0_idle =>
                         when s1_busIn =>
-                                scalar_out <= '1';
+  --                              scalar_out <= '1';
                                 mem_enable_in <= (others => '1');
                                 new_processing <= '1';
                 end case;

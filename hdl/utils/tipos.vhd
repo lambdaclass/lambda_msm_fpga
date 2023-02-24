@@ -3,6 +3,8 @@ use ieee.std_logic_1164.all;
 
 --* @brief Tipos de datos auxiliares de uso general
 
+use work.config.all;
+
 package tipos is
   
   type std_logic_2d is
@@ -14,6 +16,10 @@ package tipos is
   type std_logic_vector_a8 is
     array (natural range <>) of std_logic_vector(7 downto 0);
   
-  type natural_vector is array(natural range <>) of natural;
-  
+  type natural_vector is 
+    array(natural range <>) of natural;
+
+  type point_t is 
+    array(natural range<>) of std_logic_vector(N_vect - 1 downto 0);
+
 end package;

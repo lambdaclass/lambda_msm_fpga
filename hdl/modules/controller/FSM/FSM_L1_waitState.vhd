@@ -2,19 +2,18 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity FSM_L1_waitState is
-        generic(K : natural := 5);
         port(
                 -------------------
                 -- INPUT SIGNALS --
                 -------------------
                 clk, rst        : in std_logic;
                 start_wait      : in std_logic;
-                padd_empty      : in std_logic;
+                empty_padd      : in std_logic;
 
                 --------------------
                 -- OUTPUT SIGNALS --
                 --------------------
-                done_process    : out std_logic
+                done_L1      : out std_logic
             );
 end FSM_L1_waitState;
 
@@ -32,7 +31,7 @@ begin
                 end if;
         end process;
 
-        process(state_reg, start_wait, padd_empty)
+        process(state_reg, start_wait, empty_padd)
         begin
                 state_next <= state_reg;
 
@@ -41,22 +40,22 @@ begin
                                 state_next <= s4_waitState when start_wait = '1' else
                                               s0_idle;
                         when s4_waitState =>
-                                state_next <= s0_idle when padd_empty = '1' else
+                                state_next <= s0_idle when empty_padd = '1' else
                                               s4_waitState;
                 end case;
         end process;
 
-        process(state_reg, padd_empty)
+        process(state_reg, empty_padd)
         begin
-                done_process <= '0';
+                done_L1 <= '0';
 
                 case state_reg is
                         when s0_idle =>
                         when s4_waitState =>
-                                if padd_empty = '1' then
-                                        done_process <= '1';
+                                if empty_padd = '1' then
+                                        done_L1 <= '1';
                                 else
-                                        done_process <= '0';
+                                        done_L1 <= '0';
                                 end if;
                 end case;
         end process;

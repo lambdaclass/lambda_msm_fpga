@@ -8,11 +8,14 @@ use xpm.vcomponents.all;
 
 -- Defines N (number of bits) and q prime: 
 use work.config.all;
+use work.funciones.all;
 
 entity fifo_bank is
     generic(
-        K : integer := to_integer(ceil(real(N_esc)/real(C)));
-        DWIDTH : integer := 3*N_vect + C
+--        K : real := ceil(real(N_esc)/real(c));
+        --K : integer := 29;
+        K : integer := integer(ceil(real(N_esc)/real(c)));
+        DWIDTH : integer := 3*N_vect + c 
     );
     port(
         clk : in std_logic;
@@ -56,7 +59,7 @@ begin
             FIFO_READ_LATENCY   => 1,       -- DECIMAL
             FIFO_WRITE_DEPTH    => 16,      -- DECIMAL
             FULL_RESET_VALUE    => 0,       -- DECIMAL
-            PROG_EMPTY_THRESH   => 1,       -- DECIMAL
+            PROG_EMPTY_THRESH   => 3,       -- DECIMAL
             PROG_FULL_THRESH    => 10,      -- DECIMAL
             RD_DATA_COUNT_WIDTH => 1,       -- DECIMAL
             READ_DATA_WIDTH     => DWIDTH,  -- DECIMAL
@@ -70,7 +73,7 @@ begin
         port map (
             almost_empty    => open,
             almost_full     => open,
-            data_valid      => data_valid,
+            data_valid      => open,
             dbiterr         => open,
             dout            => dout_k(i),
             empty           => empty_o(i),
@@ -88,11 +91,11 @@ begin
             din             => din,
             injectdbiterr   => '0',
             injectsbiterr   => '0',
-            rd_en           => ren,
+            rd_en           => re,
             rst             => rst,
             sleep           => '0',
             wr_clk          => clk,
-            wr_en           => we_k
+            wr_en           => we_k(i)
         );
     end generate;
 

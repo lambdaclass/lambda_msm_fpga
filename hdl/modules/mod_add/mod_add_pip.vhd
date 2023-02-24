@@ -19,24 +19,24 @@ entity mod_add_pip is
   port(
     clk    : in  std_logic;
     rst    : in  std_logic;
-    x      : in  std_logic_vector (N - 1 downto 0);
-    y      : in  std_logic_vector (N - 1 downto 0);
+    x      : in  std_logic_vector (N_vect - 1 downto 0);
+    y      : in  std_logic_vector (N_vect - 1 downto 0);
     op     : in  std_logic;
-    result : out std_logic_vector (N - 1 downto 0)
+    result : out std_logic_vector (N_vect - 1 downto 0)
     );
     constant DELAY : NATURAL := MODADD_DELAY;
 end entity;
 
 architecture full_pipelined of mod_add_pip is
   
-  signal s0       : std_logic_vector(N downto 0);
+  signal s0       : std_logic_vector(N_vect downto 0);
   signal s0_carry : std_logic;
 
-  signal s1       : std_logic_vector(N downto 0);
+  signal s1       : std_logic_vector(N_vect downto 0);
   signal s1_carry : std_logic;
 
   signal carry : std_logic;
-  signal result_next : std_logic_vector (N - 1 downto 0);
+  signal result_next : std_logic_vector (N_vect - 1 downto 0);
   
 begin
   
@@ -45,19 +45,19 @@ begin
           std_logic_vector(signed("0" & x) - signed("0" & y)) when '1',
           (others => '0')                                     when others;
   
-  s0_carry <= s0(N);
+  s0_carry <= s0(N_vect);
 
   with op select
     s1 <= std_logic_vector(signed(s0) - signed("0" & q )) when '0',
     std_logic_vector(signed(s0) + signed("0" & q))        when '1',
     (others => '0')                                       when others;
   
-  s1_carry <= s1(N);
+  s1_carry <= s1(N_vect);
 
   carry <= (not(op) and s1_carry) or (op and not(s0_carry));
 
-  result_next <= s1(N - 1 downto 0) when carry = '0' 
-                                    else s0(N-1 downto 0);
+  result_next <= s1(N_vect - 1 downto 0) when carry = '0' 
+                                    else s0(N_vect-1 downto 0);
   process(clk)
   begin
     if clk = '1' and clk'event then

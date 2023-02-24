@@ -6,6 +6,7 @@ use ieee.math_real.all;
 
 use work.config.all;
 use work.funciones.all;
+use work.tipos.all;
 
 use work.bucket_mem;
 use work.point_adder_pip;
@@ -41,15 +42,18 @@ architecture structural of arq_msm is
        
        ----------------
        -- Bucket mem --
-       ----------------      
+       ----------------   
+       
+        constant K_window_bucket : integer := 3; 
+          
         signal bucket_clck  : std_logic; --clk 
         signal bucket_rst   : std_logic; --rst
         signal bucket_wea   : std_logic; --write enable A     
         signal bucket_web   : std_logic; --write enable B
-        signal bucket_kwa   : std_logic_vector(ceil2power(K)-1 downto 0); --enable buffer A for write
-        signal bucket_kra   : std_logic_vector(ceil2power(K)-1 downto 0); --enable buffer A for read
-        signal bucket_kwb   : std_logic_vector(ceil2power(K)-1 downto 0); --enable buffer B for write
-        signal bucket_krb   : std_logic_vector(ceil2power(K)-1 downto 0); --enable buffer B for read
+        signal bucket_kwa   : std_logic_vector(ceil2power(K_window_bucket)-1 downto 0); --enable buffer A for write
+        signal bucket_kra   : std_logic_vector(ceil2power(K_window_bucket)-1 downto 0); --enable buffer A for read
+        signal bucket_kwb   : std_logic_vector(ceil2power(K_window_bucket)-1 downto 0); --enable buffer B for write
+        signal bucket_krb   : std_logic_vector(ceil2power(K_window_bucket)-1 downto 0); --enable buffer B for read
         signal bucket_busya : std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port A
         signal bucket_busyb : std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port B
         signal bucket_emptya: std_logic_vector(K-1 downto 0);   -- Empty bit output for addressed K buckets - Port A
@@ -132,17 +136,16 @@ architecture structural of arq_msm is
         -----------
         --Data bus
         -----------
-        constant  DWIDTH_PA : integer := 72*5;  --Address
+        constant  DWIDTH_BUCKET : integer := 72*16;  --Address
         
-        type point_t is array(natural range<>) of std_logic_vector(N_esc-1 downto 0);
         signal pa_op1 : point_t(2 downto 0);
         signal pa_op2 : point_t(2 downto 0);
         signal pa_r   : point_t(2 downto 0);
        
-        signal bucket_dina : std_logic_vector (DWIDTH_PA-1 downto 0); -- Data in A
-        signal bucket_dinb : std_logic_vector (DWIDTH_PA-1 downto 0); -- Data in B      
-        signal bucket_douta : std_logic_vector (DWIDTH_PA-1 downto 0); -- Data out A
-        signal bucket_doutb : std_logic_vector (DWIDTH_PA-1 downto 0); -- Data out B
+        signal bucket_dina : std_logic_vector (DWIDTH_BUCKET-1 downto 0); -- Data in A
+        signal bucket_dinb : std_logic_vector (DWIDTH_BUCKET-1 downto 0); -- Data in B      
+        signal bucket_douta : std_logic_vector (DWIDTH_BUCKET-1 downto 0); -- Data out A
+        signal bucket_doutb : std_logic_vector (DWIDTH_BUCKET-1 downto 0); -- Data out B
         
         -- Point adder 
         -- P1
@@ -184,12 +187,18 @@ architecture structural of arq_msm is
         signal uram_addra : std_logic_vector (AWIDTH_URAM-1 downto 0); -- Address A
         signal uram_addrb : std_logic_vector (AWIDTH_URAM-1 downto 0); -- Address B
         
+        signal zero_point : std_logic_vector(DWIDTH_BUCKET-1 downto 0) := (others => '0');
 
 begin
 
-    pa_op2 <= bucket_douta when fsm_bubble_sig='1' else
-              (others => '0');
-
+    pa_op2 <= to_point_t(bucket_douta) when fsm_bubble_sig='1' else
+              to_point_t(zero_point);
+    
+    -- PA to Bucket_mem        
+    bucket_dina <= (DWIDTH_BUCKET-1 downto (3*pa_r(0)'length) => '0') & (pa_r(0) & pa_r(1) & pa_r(2));
+    
+    
+    
     U_POINT_ADDER: entity point_adder_pip
         port map(
             clk     => clk,
@@ -213,7 +222,7 @@ begin
 
     U_BUCKET_MEM: entity work.bucket_mem
     generic map(
-        K      => integer((real(N_esc)/real(C))),   -- 29 Frames  -- CONSULTAR si asi esta bien en vez de "to_integer"
+        K      => integer(ceil(real(N_esc)/real(C))),   -- 29 Frames  
         DWIDTH => 72 * 16,  -- 72*16N -- Data Width
         AWIDTH => N_esc     -- 253 Address Width
       )
@@ -259,5 +268,5 @@ begin
             dout     => fifo_bank_dout          
         );                                         
 
-                                                                       
+                                                                     
 end architecture;
