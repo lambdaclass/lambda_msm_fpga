@@ -45,7 +45,9 @@ package funciones is
    --* Construye un elemento de tipo point_t
   function to_point_t(V : std_logic_vector)
     return point_t;
-        
+   --* Construye un elemento de tres coordenadas de tipo point_t
+  function to_point_t_threeCoords(V : std_logic_vector) 
+   return point_t;
 
 end package;
 
@@ -617,6 +619,23 @@ end max;
     return p;
 end to_point_t;
 
+------------------------------------------------------------------------
+
+  function to_point_t_threeCoords(V : std_logic_vector) return point_t is
+
+    variable x, y, z : std_logic_vector(N_vect - 1 downto 0);
+    variable p : point_t(2 downto 0);
+  begin
+    x := V(N_vect - 1 downto 0);
+    y := V(2*N_vect - 1 downto N_vect);
+    z := V(3*N_vect - 1 downto 2*N_vect);
+
+    p(0) := x;
+    p(1) := y;
+    p(2) := z;
+
+    return p;
+end to_point_t_threeCoords;
 
 ------------------------------------------------------------------------
 

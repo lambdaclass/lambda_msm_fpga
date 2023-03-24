@@ -11,23 +11,21 @@ use work.funciones.all;
 
 entity point_adder_pip is
     port (
-        clk : in std_logic;
-        rst : in std_logic;
+        clk             : in std_logic;
+        rst             : in std_logic;
 
-        data_in_valid: in std_logic;
-        data_out_valid: out std_logic;
         -- P1
-        x1 : in std_logic_vector (N_vect-1 downto 0);
-        y1 : in std_logic_vector (N_vect-1 downto 0);
-        z1 : in std_logic_vector (N_vect-1 downto 0); 
+        x1              : in std_logic_vector (N_vect-1 downto 0);
+        y1              : in std_logic_vector (N_vect-1 downto 0);
+        z1              : in std_logic_vector (N_vect-1 downto 0); 
         -- P2 
-        x2 : in std_logic_vector (N_vect-1 downto 0);
-        y2 : in std_logic_vector (N_vect-1 downto 0);
-        z2 : in std_logic_vector (N_vect-1 downto 0);
+        x2              : in std_logic_vector (N_vect-1 downto 0);
+        y2              : in std_logic_vector (N_vect-1 downto 0);
+        z2              : in std_logic_vector (N_vect-1 downto 0);
         -- R
-        xr : out std_logic_vector (N_vect-1 downto 0);
-        yr : out std_logic_vector (N_vect-1 downto 0);
-        zr : out std_logic_vector (N_vect-1 downto 0)
+        xr              : out std_logic_vector (N_vect-1 downto 0);
+        yr              : out std_logic_vector (N_vect-1 downto 0);
+        zr              : out std_logic_vector (N_vect-1 downto 0)
     );
     constant DELAY : NATURAL := POINT_ADDER_DELAY;
 end entity;
@@ -482,19 +480,4 @@ begin
     yr <= a26;
     zr <= a36;
 
-    --processing delay 
-
-    data_valid: entity work.delay_M
-        generic map(
-            WORD_WIDTH => 1,
-            DELAY      => POINT_ADDER_DELAY
-        )
-        port map(
-            clk       => clk,
-            rst       => rst,
-            s         => to_slv(data_in_valid),
-            s_delayed => data_out_valid_slv
-        );
-
-        data_out_valid <= data_out_valid_slv(0);
 end architecture;
