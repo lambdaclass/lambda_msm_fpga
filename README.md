@@ -9,8 +9,7 @@ So far the repository provides:
 
 * VHDL description of hardware [modules](hdl/README.md)
 * A python software to determine optimal Karatsuba partitions
-* A python simulator of the point additions scheduling process using the proposed architecture (aiming to optimize scheduling policy)
-* A Rust implementation of a point addition in homogeneous projective coordinates.
+* A python simulator of the point additions scheduling process using the proposed architecture (aiming to optimize scheduling policy, based on discrete events simulation)
 
 ## Dependencies
 * Xilinx tools (Vivado/Vitis)

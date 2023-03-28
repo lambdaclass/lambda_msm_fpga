@@ -1,118 +1,94 @@
-from utils import split_scalars, Point, R, CLK, hazard
-from simpy import core
+from math import ceil
+from simpy.core import Environment
 from memory_module import mem
+
+from msm_controller import msm_c
 from point_adder import p_add
-from scalars import scalars as s
-from randpoints import points as rp
-from collections import deque
-from queue import Queue as q
+from utils import Point, splits_per_padds
 
-class msm:
-    def __init__(self, env : core.Environment, padd : p_add, memory : mem):
-        ## Component instantiation
-        self.env = env
-        self.adder = padd
-        self.memory = memory
-        self.hazard_fifo : list[q[hazard]] = [ q(100) for _ in range(memory.windows) ]
 
-        ## Measure values
-        self.max_per_fifo = [0 for _ in range(memory.windows)]
-        self.flushed = 0
-        self.clocks_per_stage = [env.now for _ in range(2)]
+class MSM():
+    curve = "BLS12-377"
+    coordinates = "Homogeneous projective coordinates"
+    scalar_bits = 253
 
-    def __del__(self):
-        pass
+    number_of_elements = 0
+    number_of_controllers = 0
     
-    # Stage 1 - Adding points into its respective buckets
-    def bucket_aggregation(self, points : deque, scalars : deque):
-        while len(points) != 0:
-            if self.full_hazards():
-                yield self.env.process(self.flush())
+    environment = Environment()
 
-            p, sc = points.pop(), split_scalars(scalars.pop(), self.memory.windows, self.memory.buckets_per_window)
-            p_ext = Point(p[0], p[1], 0x1)
-            bcs = [] 
-            for i in range(len(sc)):
-                bcs.append(self.memory.read(i, sc[i]))
+    memory = []
+    controllers = []
+    
+    ## Nota: El disenio que estoy haciendo fragmenta la memoria en la cantidad de p_adds que pueda agregar en el disenio.
+    ## Asi, estoy teniendo un problema con la numeracion de las ventanas. Si o si tengo que pasarle el rango de ventanas
+    ## a cada controlador para que sepa con que escalares trabajar.
 
-            yield self.env.timeout(CLK)
+    def __init__(self, c, n_segments, n_elements, n_controllers):
 
-            for i in range(len(bcs)):
-                if not self.adder.empty_FIFO():
-                    print("Value on FIFO. Putting into bucket... - Time : ", self.env.now)
-                    res = self.adder.outside_ADD.get()
-                    self.memory.set(res[1], res[2], res[0])
+        number_windows = ceil(self.scalar_bits / c)
+        window_division = ceil(number_windows / n_controllers)
+        print(number_windows, c, window_division)
+        self.number_of_elements = n_elements
+        self.number_of_controllers = n_controllers
 
-                if bcs[i][1].IS_EMPTY:
-                    print("Empty. Putting into bucket... - Time : ", self.env.now)
-                    self.memory.set(i, sc[i], p_ext)
+        w = []
+        i = 0
+        while i + window_division < number_windows:
+            w.append(window_division)
+            i += window_division
 
-                elif not bcs[i][1].IS_BUSY:
-                    print("Available for processing. Putting into PADD... - Time : ", self.env.now)
-                    self.env.process(self.adder.process_point(p_ext, bcs[i][0], (i, sc[i])))
-                    self.memory.set_busy(i, sc[i])
+        w.append(number_windows - i)
 
-                else:
-                    print("Busy. Putting into LP-FIFO... - Time : ", self.env.now, ". Size = ", self.hazard_fifo[i].qsize() + 1)
-                    self.hazard_fifo[i].put(hazard(p, sc[i]))
+        ## Falta algo aca
+        range_mem = splits_per_padds(n_controllers, c) 
+        print(range_mem)
+        print("Number of controllers ", n_controllers)
+        for i in range(n_controllers):
+            m = mem(w[i], c, n_segments)
+            adder = p_add(self.environment)
+            self.memory.append(m)
+            
+            ## I have to split the range of scalars for each controller 
+            self.controllers.append(msm_c(self.environment, adder, m, 100, range_mem[i], number_windows))
 
-                yield self.env.timeout(CLK)
+    def run(self, q_points, q_scalars):
+        if len(q_points) == 0 or len(q_scalars) == 0:
+            print("Error - Scalars or points are not set")
+            exit()
 
-        self.env.process(self.flush())
-        self.env.process(self.wait_for_padd())
+        print("===== Loop 1 - Bucket aggregation =====")
+    
+        for i in range(self.number_of_controllers):
+            print("Queueing controller ", self.controllers[i])
+            self.environment.process(self.controllers[i].bucket_aggregation(q_points, q_scalars))
 
-    # Stage 2 - Consistent sum of buckets per window
-    def bucket_addition(self):
-        pass
+        self.environment.run()
 
-    # Stage 3 - Reconstruction of solution 
-    def window_addition(self):
-        pass
+        print("Loop 1 finished in ", self.environment.now, " ticks")
 
-    def full_hazards(self):
-        is_one_full = False
+## Note: If c is less than 12, then there're gonna be unused space, and more collitions are capable to appear. But if there's a good
+##       heuristic in how to handle those points, then we could only use one memory block.
 
-        for f in self.hazard_fifo:
-            is_one_full |= f.full()
+## This code block is well executed. I don't get why it doesn't work in the actual loop.
+#        print("=== Filling and dumping g_mem ===")
 
-        return is_one_full
-
-    def wait_for_padd(self):
-        print("Waiting for PADD to finish")
-        while True:
-            print("Elements left - ", self.adder.processing)
-            if self.adder.processing == 0 and self.adder.empty_FIFO():
-                break
-
-            if not self.adder.empty_FIFO():
-                res = self.adder.outside_ADD.get()
-                self.memory.set(res[1],res[2],res[0])
-
-            yield self.env.timeout(CLK)
-
-    def flush(self):
-        print("Se ejecuta?")
-        n = self.hazard_fifo[0].maxsize
-        while n > 0:
-            # (punto, bucket + estados, ventana ,posicion bucket)
-            new_buckets = []
-            for i in range(len(self.hazard_fifo)):
-                if self.hazard_fifo[i].qsize() > 0:
-                    t = self.hazard_fifo[i].get()
-                    new_buckets.append( (t.point, self.memory.read(i, t.bucket_addr), i, t.bucket_addr ))
-            yield self.env.timeout(CLK)
-
-            for elem in new_buckets:
-                if elem[1][1].IS_BUSY:
-                    print("Back to FIFO")
-                else:
-                    print("Go to PADD")
-                    self.env.process(self.adder.process_point(elem[0],elem[1][0], (elem[2], elem[3])))
-
-                yield self.env.timeout(CLK)
-        self.flushed += 1
-        print("All fifos flushed")
+#        for mem in self.memory:
+#            for m in range(mem.segments):
+#                for k in range(mem.windows):
+#                    mem.set_g(k, m, Point(10,10,10))
+#        
+#        for m in self.memory:
+#            print(m.g_mem)
 
 
-    def execution(self):
-        pass
+#
+        print("===== Loop 2 - Bucket addition =====")
+
+        for i in range(self.number_of_controllers):
+            print("Queueing for loop 1 - Controller ", self.controllers[i])
+            self.environment.process(self.controllers[i].bucket_addition())
+
+#        self.environment.run()
+#
+#        print(self.memory[0].sum_mem)

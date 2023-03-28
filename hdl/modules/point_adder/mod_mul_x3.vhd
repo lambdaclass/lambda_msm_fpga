@@ -10,15 +10,15 @@ entity mod_mul_x3 is
         clk : in std_logic;
         rst : in std_logic;
         
-        x : in std_logic_vector (N-1 downto 0);
-        r : out std_logic_vector(N-1 downto 0)
+        x : in std_logic_vector (N_vect-1 downto 0);
+        r : out std_logic_vector(N_vect-1 downto 0)
     );
 end entity;
 
 architecture modadders of mod_mul_x3 is
 
-    signal x2: std_logic_vector(N-1 downto 0);
-    signal x_d: std_logic_vector(N-1 downto 0);
+    signal x2: std_logic_vector(N_vect-1 downto 0);
+    signal x_d: std_logic_vector(N_vect-1 downto 0);
 
 
 begin
@@ -35,7 +35,7 @@ begin
 
     UDX: entity work.delay_1
     generic map(
-        WORD_WIDTH => N
+        WORD_WIDTH => N_vect
     )
     port map(
         clk       => clk,

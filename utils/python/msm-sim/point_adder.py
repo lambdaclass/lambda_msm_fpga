@@ -1,6 +1,6 @@
 import queue as q
 from simpy import core
-from utils import mod_add, mod_mul, mod_sub, Point, PADD_PIPELINE_DEPTH
+from utils import mod_add, mod_mul, mod_sub, Point, PADD_PIPELINE_DEPTH, mem_location
 
 class p_add:
     def __init__(self, env : core.Environment):
@@ -8,20 +8,31 @@ class p_add:
         self.env = env
         self.processing = 0
         self.outside_ADD = q.Queue()
+#        self.outside_ADD_gm = q.Queue()
+#        self.outside_ADD_sm = q.Queue()
 
     def __del__(self):
         print("Class destructor - Point adder")
 
-    def process_point(self, point : Point, bucket : Point, addr):
+    def process_point(self, memory_location, window, bucket_addr, point : Point, bucket : Point):
         time_i = self.env.now
         self.processing += 1
         print("On pipeline :", self.processing)
         yield self.env.timeout(PADD_PIPELINE_DEPTH)
         self.processing -= 1
         print("Value processed. Initial time :", time_i, ", Final time :", self.env.now, ". On pipeline : ", self.processing)
-        print("Points : ", point, bucket)
-        self.outside_ADD.put( (self.add_point(point, bucket), addr[0], addr[1]) )
+        ## Put (window, bucket, point)
 
+        self.outside_ADD.put((self.add_point(point, bucket), window, bucket_addr, memory_location))
+
+#        match memory_location:
+#            case mem_location.g:
+#                self.outside_ADD_gm.put((window, bucket_addr, self.add_point(point, bucket)) )
+#            case mem_location.sum:
+#                self.outside_ADD_sm.put((window, bucket_addr, self.add_point(point, bucket)) )
+#            case _:
+#                self.outside_ADD.put( (window, bucket_addr, self.add_point(point, bucket)) )
+                
     def add_point(self, P : Point, Q : Point):
         ## P = (X1, Y1, Z1) ; Q = (X2, Y2, Z2)
         x1, y1, z1 = P.x, P.y, P.z

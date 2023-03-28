@@ -12,9 +12,9 @@ entity mod_mul_pip is
     port (
         clk : in std_logic;
         rst : in std_logic;
-        a   : in std_logic_vector(N-1 downto 0);
-        b   : in std_logic_vector(N-1 downto 0);
-        r   : out std_logic_vector(N-1 downto 0) 
+        a   : in std_logic_vector(N_vect-1 downto 0);
+        b   : in std_logic_vector(N_vect-1 downto 0);
+        r   : out std_logic_vector(N_vect-1 downto 0) 
     );
     constant DELAY : NATURAL := MODMUL_DELAY;
 end entity;

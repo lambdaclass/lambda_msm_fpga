@@ -8,21 +8,23 @@ use xpm.vcomponents.all;
 
 -- Defines N (number of bits) and q prime: 
 use work.config.all;
+use work.funciones.all;
 
 entity fifo_bank is
     generic(
-        K : integer := to_integer(ceil(real(N_esc)/real(C)));
-        DWIDTH : integer := 3*N_vect + C
+        K       : integer := integer(ceil(real(N_esc)/real(c)));
+        DWIDTH  : integer := 3*N_vect + c 
     );
     port(
-        clk : in std_logic;
-        rst : in std_logic;
-        din : in std_logic_vector(DWIDTH-1 downto 0);
-        kw  : in std_logic_vector(ceil2power(K)-1 downto 0);
-        we  : in std_logic;
-        dout: out std_logic_vector(DWIDTH-1 downto 0);
-        kr  : in std_logic_vector(ceil2power(K)-1 downto 0);
-        re  : in std_logic;
+        clk     : in std_logic;
+        rst     : in std_logic;
+        din     : in std_logic_vector(DWIDTH-1 downto 0);
+        kw      : in std_logic_vector(ceil2power(K)-1 downto 0);
+        we      : in std_logic;
+        kr      : in std_logic_vector(ceil2power(K)-1 downto 0);
+        re      : in std_logic;
+
+        dout    : out std_logic_vector(DWIDTH-1 downto 0);
         empty_o : out std_logic_vector(K-1 downto 0);
         full_o  : out std_logic_vector(K-1 downto 0)
     );
@@ -34,6 +36,8 @@ architecture rtl of fifo_bank is
     signal dout_k   : out_bus(K-1 downto 0);
     signal we_k     : std_logic_vector(K-1 downto 0);
 
+    signal empty_o_tmp          : std_logic_vector(K-1 downto 0);
+    signal empty_delay_flag     : std_logic;
 begin
 
     U1A_WEA_DECODER: process(kw, we)
@@ -56,7 +60,7 @@ begin
             FIFO_READ_LATENCY   => 1,       -- DECIMAL
             FIFO_WRITE_DEPTH    => 16,      -- DECIMAL
             FULL_RESET_VALUE    => 0,       -- DECIMAL
-            PROG_EMPTY_THRESH   => 1,       -- DECIMAL
+            PROG_EMPTY_THRESH   => 3,       -- DECIMAL
             PROG_FULL_THRESH    => 10,      -- DECIMAL
             RD_DATA_COUNT_WIDTH => 1,       -- DECIMAL
             READ_DATA_WIDTH     => DWIDTH,  -- DECIMAL
@@ -70,10 +74,10 @@ begin
         port map (
             almost_empty    => open,
             almost_full     => open,
-            data_valid      => data_valid,
+            data_valid      => open,
             dbiterr         => open,
             dout            => dout_k(i),
-            empty           => empty_o(i),
+            empty           => empty_o_tmp(i),
             full            => full_o(i),
             overflow        => open,
             prog_empty      => open,
@@ -88,13 +92,28 @@ begin
             din             => din,
             injectdbiterr   => '0',
             injectsbiterr   => '0',
-            rd_en           => ren,
+            rd_en           => re,
             rst             => rst,
             sleep           => '0',
             wr_clk          => clk,
-            wr_en           => we_k
+            wr_en           => we_k(i)
         );
     end generate;
+
+    empty_delay_flag <= clk and re;
+
+    EMPTY_FLAGS_DELAY: entity work.delay_1
+    generic map(
+    WORD_WIDTH => K
+               )
+    port map(
+        clk => empty_delay_flag,
+        rst => rst, 
+
+        s => empty_o_tmp,
+        s_delayed => empty_o
+                );
+
 
     U2A_DOUT_MUX: process(kr, dout_k)
     begin

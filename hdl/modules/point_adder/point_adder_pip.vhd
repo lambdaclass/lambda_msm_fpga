@@ -11,23 +11,21 @@ use work.funciones.all;
 
 entity point_adder_pip is
     port (
-        clk : in std_logic;
-        rst : in std_logic;
+        clk             : in std_logic;
+        rst             : in std_logic;
 
-        data_in_valid: in std_logic;
-        data_out_valid: out std_logic;
         -- P1
-        x1 : in std_logic_vector (N-1 downto 0);
-        y1 : in std_logic_vector (N-1 downto 0);
-        z1 : in std_logic_vector (N-1 downto 0); 
+        x1              : in std_logic_vector (N_vect-1 downto 0);
+        y1              : in std_logic_vector (N_vect-1 downto 0);
+        z1              : in std_logic_vector (N_vect-1 downto 0); 
         -- P2 
-        x2 : in std_logic_vector (N-1 downto 0);
-        y2 : in std_logic_vector (N-1 downto 0);
-        z2 : in std_logic_vector (N-1 downto 0);
+        x2              : in std_logic_vector (N_vect-1 downto 0);
+        y2              : in std_logic_vector (N_vect-1 downto 0);
+        z2              : in std_logic_vector (N_vect-1 downto 0);
         -- R
-        xr : out std_logic_vector (N-1 downto 0);
-        yr : out std_logic_vector (N-1 downto 0);
-        zr : out std_logic_vector (N-1 downto 0)
+        xr              : out std_logic_vector (N_vect-1 downto 0);
+        yr              : out std_logic_vector (N_vect-1 downto 0);
+        zr              : out std_logic_vector (N_vect-1 downto 0)
     );
     constant DELAY : NATURAL := POINT_ADDER_DELAY;
 end entity;
@@ -38,56 +36,56 @@ architecture full_pipelined of point_adder_pip is
     constant DIFF : std_logic := '1';
 
     -- Circuit layer 1
-    signal m11 : std_logic_vector(N-1 downto 0);
-    signal m21 : std_logic_vector(N-1 downto 0);
-    signal m31 : std_logic_vector(N-1 downto 0);
-    signal a11 : std_logic_vector(N-1 downto 0);
-    signal a21 : std_logic_vector(N-1 downto 0);
-    signal a31 : std_logic_vector(N-1 downto 0);
-    signal a41 : std_logic_vector(N-1 downto 0);
-    signal a51 : std_logic_vector(N-1 downto 0);
-    signal a61 : std_logic_vector(N-1 downto 0);
+    signal m11 : std_logic_vector(N_vect-1 downto 0);
+    signal m21 : std_logic_vector(N_vect-1 downto 0);
+    signal m31 : std_logic_vector(N_vect-1 downto 0);
+    signal a11 : std_logic_vector(N_vect-1 downto 0);
+    signal a21 : std_logic_vector(N_vect-1 downto 0);
+    signal a31 : std_logic_vector(N_vect-1 downto 0);
+    signal a41 : std_logic_vector(N_vect-1 downto 0);
+    signal a51 : std_logic_vector(N_vect-1 downto 0);
+    signal a61 : std_logic_vector(N_vect-1 downto 0);
 
     -- Circuit layer 2
-    signal a12 : std_logic_vector(N-1 downto 0);
-    signal a22 : std_logic_vector(N-1 downto 0);
-    signal a32 : std_logic_vector(N-1 downto 0);
-    signal m12 : std_logic_vector(N-1 downto 0);
-    signal m22 : std_logic_vector(N-1 downto 0);
-    signal m32 : std_logic_vector(N-1 downto 0);
+    signal a12 : std_logic_vector(N_vect-1 downto 0);
+    signal a22 : std_logic_vector(N_vect-1 downto 0);
+    signal a32 : std_logic_vector(N_vect-1 downto 0);
+    signal m12 : std_logic_vector(N_vect-1 downto 0);
+    signal m22 : std_logic_vector(N_vect-1 downto 0);
+    signal m32 : std_logic_vector(N_vect-1 downto 0);
 
     -- Circuit layer 3
-    signal d13      : std_logic_vector(N-1 downto 0);
-    signal d23      : std_logic_vector(N-1 downto 0);
-    signal c3m13    : std_logic_vector(N-1 downto 0);
-    signal s13      : std_logic_vector(N-1 downto 0);
-    signal s23      : std_logic_vector(N-1 downto 0);
-    signal s33      : std_logic_vector(N-1 downto 0);
+    signal d13      : std_logic_vector(N_vect-1 downto 0);
+    signal d23      : std_logic_vector(N_vect-1 downto 0);
+    signal c3m13    : std_logic_vector(N_vect-1 downto 0);
+    signal s13      : std_logic_vector(N_vect-1 downto 0);
+    signal s23      : std_logic_vector(N_vect-1 downto 0);
+    signal s33      : std_logic_vector(N_vect-1 downto 0);
 
     -- Ciurcuit layer 4
-    signal c3m14    : std_logic_vector(N-1 downto 0);
-    signal a14      : std_logic_vector(N-1 downto 0);
-    signal a14_d    : std_logic_vector(N-1 downto 0);
+    signal c3m14    : std_logic_vector(N_vect-1 downto 0);
+    signal a14      : std_logic_vector(N_vect-1 downto 0);
+    signal a14_d    : std_logic_vector(N_vect-1 downto 0);
 
-    signal s14      : std_logic_vector(N-1 downto 0);
-    signal s14_d    : std_logic_vector(N-1 downto 0);
-
-    signal d14      : std_logic_vector(N-1 downto 0);
-    signal c3m24    : std_logic_vector(N-1 downto 0);
-    signal d24      : std_logic_vector(N-1 downto 0);
+    signal s14      : std_logic_vector(N_vect-1 downto 0);
+    signal s14_d    : std_logic_vector(N_vect-1 downto 0);
+                                        
+    signal d14      : std_logic_vector(N_vect-1 downto 0);
+    signal c3m24    : std_logic_vector(N_vect-1 downto 0);
+    signal d24      : std_logic_vector(N_vect-1 downto 0);
 
     -- Ciurcuit layer 5
-    signal m15 : std_logic_vector(N-1 downto 0);
-    signal m25 : std_logic_vector(N-1 downto 0);
-    signal m35 : std_logic_vector(N-1 downto 0);
-    signal m45 : std_logic_vector(N-1 downto 0);
-    signal m55 : std_logic_vector(N-1 downto 0);
-    signal m65 : std_logic_vector(N-1 downto 0);
+    signal m15 : std_logic_vector(N_vect-1 downto 0);
+    signal m25 : std_logic_vector(N_vect-1 downto 0);
+    signal m35 : std_logic_vector(N_vect-1 downto 0);
+    signal m45 : std_logic_vector(N_vect-1 downto 0);
+    signal m55 : std_logic_vector(N_vect-1 downto 0);
+    signal m65 : std_logic_vector(N_vect-1 downto 0);
 
     -- Circuit layer 6 (output)
-    signal s16 : std_logic_vector(N-1 downto 0);
-    signal a26 : std_logic_vector(N-1 downto 0);
-    signal a36 : std_logic_vector(N-1 downto 0);
+    signal s16 : std_logic_vector(N_vect-1 downto 0);
+    signal a26 : std_logic_vector(N_vect-1 downto 0);
+    signal a36 : std_logic_vector(N_vect-1 downto 0);
 
     signal data_out_valid_slv: std_logic_vector(0 downto 0);
 
@@ -243,7 +241,7 @@ begin
     
     UD13: entity work.delay_M
         generic map(
-            WORD_WIDTH => N,
+            WORD_WIDTH => N_vect,
             DELAY      => 2 * MODADD_DELAY
         )
         port map(
@@ -255,7 +253,7 @@ begin
         
     UD23: entity work.delay_M
         generic map(
-            WORD_WIDTH => N,
+            WORD_WIDTH => N_vect,
             DELAY      => 2 * MODADD_DELAY
         )
         port map(
@@ -325,7 +323,7 @@ begin
 
     UA14_D: entity work.delay_M
         generic map(
-            WORD_WIDTH => N,
+            WORD_WIDTH => N_vect,
             DELAY      => MODADD_DELAY
         )
         port map(
@@ -347,7 +345,7 @@ begin
 
     US14_D: entity work.delay_M
         generic map(
-            WORD_WIDTH => N,
+            WORD_WIDTH => N_vect,
             DELAY      => MODADD_DELAY
         )
         port map(
@@ -359,7 +357,7 @@ begin
 
     UD14: entity work.delay_M
         generic map(
-            WORD_WIDTH => N,
+            WORD_WIDTH => N_vect,
             DELAY      => 2 * MODADD_DELAY
         )
         port map(
@@ -379,7 +377,7 @@ begin
 
     UD24: entity work.delay_M
     generic map(
-        WORD_WIDTH => N,
+        WORD_WIDTH => N_vect,
         DELAY      => 2 * MODADD_DELAY
     )
     port map(
@@ -482,19 +480,4 @@ begin
     yr <= a26;
     zr <= a36;
 
-    --processing delay 
-
-    data_valid: entity work.delay_M
-        generic map(
-            WORD_WIDTH => 1,
-            DELAY      => POINT_ADDER_DELAY
-        )
-        port map(
-            clk       => clk,
-            rst       => rst,
-            s         => to_slv(data_in_valid),
-            s_delayed => data_out_valid_slv
-        );
-
-        data_out_valid <= data_out_valid_slv(0);
 end architecture;

@@ -12,33 +12,31 @@ entity bucket_mem is
     AWIDTH : integer := 12*3     --253 Address Width
   );
   port(
-    clk   : in std_logic;                                  -- Clock
-    rst   : in std_logic;                                  -- Reset
+    clk         : in std_logic;                                  -- Clock
+    rst         : in std_logic;                                  -- Reset
     -- Port A
-    wea   : in std_logic;                                  -- Write Enable - Port A
-    dina  : in std_logic_vector(DWIDTH-1 downto 0);       -- Data Input - Port A
-    addra : in std_logic_vector(AWIDTH-1 downto 0);      -- Address Input - Port A
-    douta : out std_logic_vector(DWIDTH-1 downto 0);      -- Data Output - Port A
-    kwa   : in std_logic_vector(ceil2power(K)-1 downto 0);-- K select for write - Port A
-    kra   : in std_logic_vector(ceil2power(K)-1 downto 0);-- K select for read - Port A
+    wea         : in std_logic;                                  -- Write Enable - Port A
+    dina        : in std_logic_vector(DWIDTH-1 downto 0);       -- Data Input - Port A
+    addra       : in std_logic_vector(AWIDTH-1 downto 0);      -- Address Input - Port A
+    douta       : out std_logic_vector(DWIDTH-1 downto 0);      -- Data Output - Port A
+    kwa         : in std_logic_vector(ceil2power(K)-1 downto 0);-- K select for write - Port A
+    kra         : in std_logic_vector(ceil2power(K)-1 downto 0);-- K select for read - Port A
     -- Port B
-    web   : in std_logic;                                  -- Write Enable - Port B
-    dinb  : in std_logic_vector(DWIDTH-1 downto 0);       -- Data Input - Port B
-    addrb : in std_logic_vector(AWIDTH-1 downto 0);      -- Address Input - Port B
-    doutb : out std_logic_vector(DWIDTH-1 downto 0);     -- Data Output - Port B
-    kwb   : in std_logic_vector(ceil2power(K)-1 downto 0); -- K select for write - Port B
-    krb   : in std_logic_vector(ceil2power(K)-1 downto 0); -- K select for read - Port A
+    web         : in std_logic;                                  -- Write Enable - Port B
+    dinb        : in std_logic_vector(DWIDTH-1 downto 0);       -- Data Input - Port B
+    addrb       : in std_logic_vector(AWIDTH-1 downto 0);      -- Address Input - Port B
+    doutb       : out std_logic_vector(DWIDTH-1 downto 0);     -- Data Output - Port B
+    kwb         : in std_logic_vector(ceil2power(K)-1 downto 0); -- K select for write - Port B
+    krb         : in std_logic_vector(ceil2power(K)-1 downto 0); -- K select for read - Port A
     -- Flags
-    busya_o  : out std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port A
-    busyb_o  : out std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port B
-    emptya_o : out std_logic_vector(K-1 downto 0);   -- Empty bit output for addressed K buckets - Port A
-    emptyb_o : out std_logic_vector(K-1 downto 0)    -- Empty bit output for addressed K buckets - Port B
+    busya_o     : out std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port A
+    busyb_o     : out std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port B
+    emptya_o    : out std_logic_vector(K-1 downto 0);   -- Empty bit output for addressed K buckets - Port A
+    emptyb_o    : out std_logic_vector(K-1 downto 0)    -- Empty bit output for addressed K buckets - Port B
   );
 end bucket_mem;
 
 architecture rtl of bucket_mem is
-
-  constant URAM_AWIDTH : integer := integer(ceil(real(AWIDTH)/real(K)));
 
   signal wea_k : std_logic_vector(K-1 downto 0);
   signal web_k : std_logic_vector(K-1 downto 0);
@@ -50,20 +48,13 @@ architecture rtl of bucket_mem is
   signal douta_k : out_bus(K-1 downto 0);
   signal doutb_k : out_bus(K-1 downto 0);
 
-  signal addra_padded : std_logic_vector((URAM_AWIDTH*K)-1 downto 0) := (others=>'0');
-  signal addrb_padded : std_logic_vector((URAM_AWIDTH*K)-1 downto 0) := (others=>'0');
-
-
 begin
-
-addra_padded(AWIDTH-1 downto 0) <= addra;
-addrb_padded(AWIDTH-1 downto 0) <= addrb;
 
 U0_URAMS: for i in 0 to K-1 generate
 
   U_RAM: entity work.uram_dp_wf
     generic map(
-      AWIDTH => URAM_AWIDTH,  -- Address Width
+      AWIDTH => AWIDTH,  -- Address Width
       DWIDTH => DWIDTH        -- Data Width 
     )
     port map(
@@ -73,10 +64,10 @@ U0_URAMS: for i in 0 to K-1 generate
       mem_ena  => '1',      -- Memory Enable - Port A
       mem_enb  => '1',      -- Memory Enable - Port B
       dina    => dina,      -- Data Input - Port A
-      addra   => addra_padded((URAM_AWIDTH*(i+1))-1 downto (URAM_AWIDTH*i)),     -- Address Input - Port A
+      addra   => addra,   
       douta   => douta_k(i),-- Data Output - Port A
       dinb    => dinb,      -- Data Input - Port B
-      addrb   => addrb_padded((URAM_AWIDTH*(i+1))-1 downto (URAM_AWIDTH*i)),     -- Address Input - Port B
+      addrb   => addrb,     -- Address Input - Port B
       doutb   => doutb_k(i) -- Data Output - Port B
     );
 
@@ -102,12 +93,12 @@ U0_URAMS: for i in 0 to K-1 generate
 
   U2A_DOUT_MUX: process(kra_d, douta_k)
   begin
-    douta <= douta_k(to_integer(unsigned(kra)));
+    douta <= douta_k(to_integer(unsigned(kra_d)));
   end process;
 
   U2B_DOUT_MUX: process(krb_d, doutb_k)
   begin
-    doutb <= doutb_k(to_integer(unsigned(krb)));
+    doutb <= doutb_k(to_integer(unsigned(krb_d)));
   end process;
 
   U3_DELAYS_PROC: process(clk)

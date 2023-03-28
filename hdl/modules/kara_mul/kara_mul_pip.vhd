@@ -14,9 +14,9 @@ entity kara_mul_pip is
     port (
         clk : in std_logic;
         rst : in std_logic;
-        x   : in std_logic_vector(N-1 downto 0);
-        y   : in std_logic_vector(N-1 downto 0);
-        z   : out std_logic_vector(2*N - 1 downto 0) 
+        x   : in std_logic_vector(N_vect-1 downto 0);
+        y   : in std_logic_vector(N_vect-1 downto 0);
+        z   : out std_logic_vector(2*N_vect - 1 downto 0) 
     );
 end entity;
 

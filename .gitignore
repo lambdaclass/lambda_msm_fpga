@@ -1,0 +1,27 @@
+sim_build
+build
+transcript
+modelsim.ini
+vsim.wlf
+vish_stacktrace.vstf
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.bin
+*.d
+*.o
+*.elf
+
+*.log
+*.ghw
+*.xml
+
+.cocotb
+*.cf
+hdl/modules/mod_mul/sim/mod_mul
+hdl/modules/point_adder/sim/point_adder
+.python-version
+

@@ -8,8 +8,10 @@ package config is
   
        constant  N_vect : natural := 377;  -- Operands bit size for G_n
        constant  N_esc : natural := 253;  -- Operands bit size for x_n
-       constant  c : natural := 9;
-       constant  K : natural := 29;  --K windows     
+       constant  c : natural := 12;
+       constant  K : natural := 22;  --K windows     
+       constant  DSP_SIZE : natural := 18;
+       constant  q: unsigned(N_vect-1 downto 0) := '1' & x"ae3a4617c510eac63b05c06ca1493b1a22d9f300f5138f1ef3622fba094800170b5d44300000008508c00000000001";
    
 end package;
 
