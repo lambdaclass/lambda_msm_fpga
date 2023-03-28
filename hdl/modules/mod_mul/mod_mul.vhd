@@ -68,8 +68,8 @@ begin
             L => 1                   -- Current tree level
         )
         port map(
-            clk => '0',
-            rst => '0',
+            clk => GND,
+            rst => GND,
             x => a,
             y => b,
             z => mult_int 
