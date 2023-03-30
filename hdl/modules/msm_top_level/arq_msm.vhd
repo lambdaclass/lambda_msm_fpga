@@ -14,7 +14,7 @@ use work.bucket_mem;
 use work.point_adder_pip;
 use work.fifo_bank;
 use work.delay_M;
-use work.Controller;
+use work.controller;
 
 entity msm_architecture is
     generic(
@@ -35,6 +35,10 @@ entity msm_architecture is
         --output: x,y,x coordinates
 
         fifo_input_we : in std_logic;
+
+        fifo_input_full : out std_logic;
+        fifo_input_almost_empty: out std_logic;
+        fifo_input_wrst_busy : out std_logic;
 
         x   : out std_logic_vector(N_vect-1 downto 0);  --output coordinate X
         y   : out std_logic_vector(N_vect-1 downto 0);  --output coordinate Y
@@ -105,7 +109,6 @@ architecture Structural of msm_architecture is
         signal fifo_input_dout      : std_logic_vector(2*N_vect + N_esc - 1 downto 0);
         signal fifo_input_din       : std_logic_vector(2*N_vect + N_esc - 1 downto 0);
         signal fifo_input_empty     : std_logic;
-        signal fifo_input_full      : std_logic;
         signal fifo_input_re        : std_logic;
         
         -----------------------------------------------------------------------------------
@@ -173,14 +176,14 @@ begin
             FULL_RESET_VALUE    => 0,       -- DECIMAL
             PROG_EMPTY_THRESH   => 3,       -- DECIMAL
             PROG_FULL_THRESH    => 10,      -- DECIMAL
-            RD_DATA_COUNT_WIDTH => 1,       -- DECIMAL
+            RD_DATA_COUNT_WIDTH => 5,       -- DECIMAL
             READ_DATA_WIDTH     => 2*N_vect + N_esc,  -- DECIMAL
             READ_MODE           => "std",   -- String
             SIM_ASSERT_CHK      => 0,       -- DECIMAL; 0=disable simulation messages, 1=enable simulation messages
             USE_ADV_FEATURES    => "0707",  -- String
             WAKEUP_TIME         => 0,       -- DECIMAL
             WRITE_DATA_WIDTH    => 2*N_vect + N_esc,  -- DECIMAL
-            WR_DATA_COUNT_WIDTH => 1        -- DECIMAL
+            WR_DATA_COUNT_WIDTH => 5        -- DECIMAL
             )
         port map (
             almost_empty    => open,
@@ -191,7 +194,7 @@ begin
             empty           => fifo_input_empty,
             full            => fifo_input_full,
             overflow        => open,
-            prog_empty      => open,
+            prog_empty      => fifo_input_almost_empty,
             prog_full       => open,
             rd_data_count   => open,
             rd_rst_busy     => open,
@@ -199,7 +202,7 @@ begin
             underflow       => open,
             wr_ack          => open,
             wr_data_count   => open,
-            wr_rst_busy     => open,
+            wr_rst_busy     => fifo_input_wrst_busy,
             din             => fifo_input_din,
             injectdbiterr   => '0',
             injectsbiterr   => '0',
@@ -340,7 +343,7 @@ begin
         -----------------------------------------------------------------------------------
         -----------------------------------------------------------------------------------
 
-        U_CONTROLLER: entity work.Controller
+        U_CONTROLLER: entity work.controller
         generic map(
                 K => K,
                 U => U,
@@ -370,7 +373,6 @@ begin
                 bucket_emptyB   => bucket_state(0),
                 bucket_busyB    => bucket_state(1),
 
-                point_sel_out   => open,
                 point_next      => input_fifo_next,
                 padd_dv_out     => pa_data_in_valid,
 
@@ -416,7 +418,7 @@ begin
                 M       => segment_value,
                 U       => element_value,
 
-                select_loop => '1',
+                select_loop => bucket_mem_sel,
                 select_addr_A => sel_address_A,
                 select_addr_B => sel_address_B,
 
