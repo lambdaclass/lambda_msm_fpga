@@ -34,17 +34,14 @@ entity msm_axis_wrapper is
         -- AXI-Stream Master Outputs
         -- R_x
         m00_axis_tdata   : out std_logic_vector(N_vect_axi - 1 downto 0);
-        m00_axis_tready  : out std_logic;
         m00_axis_tvalid  : out std_logic;
 
         -- R_y
         m01_axis_tdata   : out std_logic_vector(N_vect_axi - 1 downto 0);
-        m01_axis_tready  : out std_logic;
         m01_axis_tvalid  : out std_logic;
 
         -- R_z
         m02_axis_tdata   : out std_logic_vector(N_vect_axi - 1 downto 0);
-        m02_axis_tready  : out std_logic;
         m02_axis_tvalid  : out std_logic;
         -- System Clock and Reset
         clk              : in  std_logic;
