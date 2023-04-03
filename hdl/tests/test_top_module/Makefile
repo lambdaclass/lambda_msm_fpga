@@ -1,7 +1,9 @@
 TOPLEVEL_LANG = vhdl
 SIM = ghdl
 
-XPM_LIB:=../../../xpm
+XPM:=../../../xpm
+XPM_LIB:=$(XPM)/lib
+CUSTOM_COMPILE_DEPS=xpm
 
 VHDL_SOURCES += ../../config.vhd \
         ../../utils/tipos.vhd \
@@ -26,6 +28,7 @@ TOPLEVEL=msm_architecture
 EXTRA_ARGS= --ieee=synopsys -P$(XPM_LIB) --warn-no-binding --std=08 -frelaxed-rules
 SIM_ARGS= --wave=sim_build/msm_architecture.ghw
 
+
 MODULE := test_top_msm
 
 COCOTB=$(shell cocotb-config --makefiles)
@@ -34,5 +37,12 @@ include $(COCOTB)/Makefile.sim
 
 GTK_SAVEFILE := $(wildcard sim_build/*.gtkw)
 
+.PHONY: xpm
+xpm:
+	$(MAKE) -C $(XPM)
+
 gtkwave:
 	gtkwave sim_build/msm_architecture.ghw $(GTK_SAVEFILE) 
+
+clear: clean
+	$(MAKE) -C $(XPM) clean
