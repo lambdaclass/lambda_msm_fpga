@@ -3,10 +3,10 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
 
-use work.config.ALL;
-use work.axi_local_config.ALL;
 use work.funciones.ALL;
 use work.tipos.ALL;
+use work.config.ALL;
+use work.axi_local_config.ALL;
 
 entity msm_axis_wrapper is
     generic(
@@ -46,6 +46,7 @@ entity msm_axis_wrapper is
         m02_axis_tdata   : out std_logic_vector(N_vect_axi - 1 downto 0);
         m02_axis_tready  : out std_logic;
         m02_axis_tvalid  : out std_logic;
+        done             : out std_logic;
         -- System Clock and Reset
         clk              : in  std_logic;
         rst              : in  std_logic
@@ -64,7 +65,6 @@ architecture rtl of msm_axis_wrapper is
     signal y          : std_logic_vector(N_vect - 1 downto 0);
     signal z          : std_logic_vector(N_vect - 1 downto 0);
     signal data_valid : std_logic;
-    signal done       : std_logic;
 
 begin
 

@@ -72,7 +72,7 @@ begin
             port map(
               clk    => clk,
               rst    => rst,
-              en     => '1',
+              en     => VCC,
               sin    => toggle_pulse,
               toggle => run_out_counter
               );

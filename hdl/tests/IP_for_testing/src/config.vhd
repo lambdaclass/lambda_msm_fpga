@@ -14,6 +14,7 @@ package config is
        constant  DSP_SIZE : natural := 18;
        constant  q: unsigned(N_vect-1 downto 0) := '1' & x"ae3a4617c510eac63b05c06ca1493b1a22d9f300f5138f1ef3622fba094800170b5d44300000008508c00000000001";
        constant  GND : std_logic :='0';
+       constant  VCC : std_logic :='1';
        
 end package;
 
