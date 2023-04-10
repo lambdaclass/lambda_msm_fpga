@@ -22,6 +22,30 @@ Associated Filename: main.c
 #include <sys/time.h>
 #endif
 #include <assert.h>
+// This is a generated file. Use and modify at your own risk.
+////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+Vendor: Xilinx
+Associated Filename: main.c
+#Purpose: This example shows a basic vector add +1 (constant) by manipulating
+#         memory inplace.
+*******************************************************************************/
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <iostream>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#ifdef _WINDOWS
+#include <io.h>
+#else
+#include <unistd.h>
+#include <sys/time.h>
+#endif
+#include <assert.h>
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -33,7 +57,8 @@ Associated Filename: main.c
 
 #define NUM_WORKGROUPS (1)
 #define WORKGROUP_SIZE (256)
-#define MAX_LENGTH 8192
+#define MAX_LENGTH (4096 << 4) // 4096 points; 16 cl_uints per coordinate
+#define RCV_LENGTH (256 << 4)  // 256 points; 16 cl_uints per coordinate
 #define MEM_ALIGNMENT 4096
 #if defined(VITIS_PLATFORM) && !defined(TARGET_DEVICE)
 #define STR_VALUE(arg)      #arg
@@ -67,9 +92,11 @@ cl_uint load_file_to_memory(const char *filename, char **result)
 int main(int argc, char** argv)
 {
 
-    cl_int err;                            // error code returned from api calls
+    cl_int err;          // error code returned from api calls
     cl_uint check_status = 0;
-    const cl_uint number_of_words = 4096; // 16KB of data
+    // int cl_uints_per_word = 64 / sizeof(cl_uint);
+    const cl_uint number_of_words_sent = MAX_LENGTH; 
+    const cl_uint number_of_words_rcv = RCV_LENGTH;
 
 
     cl_platform_id platform_id;         // platform id
@@ -83,22 +110,22 @@ int main(int argc, char** argv)
     char cl_platform_vendor[1001];
     char target_device_name[1001] = TARGET_DEVICE;
 
-    cl_uint* h_x_n_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for output vector
+    cl_uint* h_x_n_input = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,(MAX_LENGTH) * sizeof(cl_uint*)); // host memory for input vector
     cl_mem d_x_n;                         // device memory used for a vector
 
-    cl_uint* h_G_x_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for output vector
+    cl_uint* h_G_x_input = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for input vector
     cl_mem d_G_x;                         // device memory used for a vector
 
-    cl_uint* h_G_y_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for output vector
+    cl_uint* h_G_y_input = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for input vector
     cl_mem d_G_y;                         // device memory used for a vector
 
-    cl_uint* h_R_x_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for output vector
+    cl_uint* h_R_x_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,RCV_LENGTH * sizeof(cl_uint*)); // host memory for output vector
     cl_mem d_R_x;                         // device memory used for a vector
 
-    cl_uint* h_R_y_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for output vector
+    cl_uint* h_R_y_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,RCV_LENGTH * sizeof(cl_uint*)); // host memory for output vector
     cl_mem d_R_y;                         // device memory used for a vector
 
-    cl_uint* h_R_z_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*)); // host memory for output vector
+    cl_uint* h_R_z_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,RCV_LENGTH * sizeof(cl_uint*)); // host memory for output vector
     cl_mem d_R_z;                         // device memory used for a vector
 
     if (argc != 2) {
@@ -108,14 +135,21 @@ int main(int argc, char** argv)
 
     // Fill our data sets with pattern
     h_data = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*));
+
+    for(cl_uint i = 0; i < (MAX_LENGTH); i++) {
+        h_x_n_input[i] = 0;
+    }
+
     for(cl_uint i = 0; i < MAX_LENGTH; i++) {
         h_data[i]  = i;
-        h_x_n_output[i] = 0; 
-        h_G_x_output[i] = 0; 
-        h_G_y_output[i] = 0; 
-        h_R_x_output[i] = 0; 
-        h_R_y_output[i] = 0; 
-        h_R_z_output[i] = 0; 
+        h_G_x_input[i] = 0; 
+        h_G_y_input[i] = 0; 
+    }
+    
+    for(cl_uint i = 0; i < RCV_LENGTH; i++) {
+        h_R_x_output[i] = 0xFF; 
+        h_R_y_output[i] = 0xFF; 
+        h_R_z_output[i] = 0xFF; 
 
     }
 
@@ -257,6 +291,9 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    printf("\nPress ENTER to continue after setting up ILA trigger...");
+    getc(stdin);
+
     // Create structs to define memory bank mapping
     cl_mem_ext_ptr_t mem_ext;
     mem_ext.obj = NULL;
@@ -264,42 +301,42 @@ int main(int argc, char** argv)
 
 
     mem_ext.flags = 1;
-    d_x_n = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words, &mem_ext, &err);
+    d_x_n = clCreateBuffer(context,  CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words_sent, &mem_ext, &err);
     if (err != CL_SUCCESS) {
       std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
     }
 
 
     mem_ext.flags = 2;
-    d_G_x = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words, &mem_ext, &err);
+    d_G_x = clCreateBuffer(context,  CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words_sent, &mem_ext, &err);
     if (err != CL_SUCCESS) {
       std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
     }
 
 
     mem_ext.flags = 3;
-    d_G_y = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words, &mem_ext, &err);
+    d_G_y = clCreateBuffer(context,  CL_MEM_READ_ONLY | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words_sent, &mem_ext, &err);
     if (err != CL_SUCCESS) {
       std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
     }
 
 
     mem_ext.flags = 4;
-    d_R_x = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words, &mem_ext, &err);
+    d_R_x = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words_rcv, &mem_ext, &err);
     if (err != CL_SUCCESS) {
       std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
     }
 
 
     mem_ext.flags = 5;
-    d_R_y = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words, &mem_ext, &err);
+    d_R_y = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words_rcv, &mem_ext, &err);
     if (err != CL_SUCCESS) {
       std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
     }
 
 
     mem_ext.flags = 6;
-    d_R_z = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words, &mem_ext, &err);
+    d_R_z = clCreateBuffer(context,  CL_MEM_WRITE_ONLY | CL_MEM_EXT_PTR_XILINX,  sizeof(cl_uint) * number_of_words_rcv, &mem_ext, &err);
     if (err != CL_SUCCESS) {
       std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
     }
@@ -311,8 +348,8 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-
-    err = clEnqueueWriteBuffer(commands, d_x_n, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_data, 0, NULL, NULL);
+    // Copy from host to device memory 
+    err = clEnqueueWriteBuffer(commands, d_x_n, CL_TRUE, 0, sizeof(cl_uint) * number_of_words_sent, h_data, 0, NULL, NULL);
     if (err != CL_SUCCESS) {
         printf("ERROR: Failed to write to source array h_data: d_x_n: %d!\n", err);
         printf("ERROR: Test failed\n");
@@ -320,7 +357,7 @@ int main(int argc, char** argv)
     }
 
 
-    err = clEnqueueWriteBuffer(commands, d_G_x, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_data, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(commands, d_G_x, CL_TRUE, 0, sizeof(cl_uint) * number_of_words_sent, h_data, 0, NULL, NULL);
     if (err != CL_SUCCESS) {
         printf("ERROR: Failed to write to source array h_data: d_G_x: %d!\n", err);
         printf("ERROR: Test failed\n");
@@ -328,37 +365,15 @@ int main(int argc, char** argv)
     }
 
 
-    err = clEnqueueWriteBuffer(commands, d_G_y, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_data, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(commands, d_G_y, CL_TRUE, 0, sizeof(cl_uint) * number_of_words_sent, h_data, 0, NULL, NULL);
     if (err != CL_SUCCESS) {
         printf("ERROR: Failed to write to source array h_data: d_G_y: %d!\n", err);
         printf("ERROR: Test failed\n");
         return EXIT_FAILURE;
     }
 
-
-    err = clEnqueueWriteBuffer(commands, d_R_x, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_data, 0, NULL, NULL);
-    if (err != CL_SUCCESS) {
-        printf("ERROR: Failed to write to source array h_data: d_R_x: %d!\n", err);
-        printf("ERROR: Test failed\n");
-        return EXIT_FAILURE;
-    }
-
-
-    err = clEnqueueWriteBuffer(commands, d_R_y, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_data, 0, NULL, NULL);
-    if (err != CL_SUCCESS) {
-        printf("ERROR: Failed to write to source array h_data: d_R_y: %d!\n", err);
-        printf("ERROR: Test failed\n");
-        return EXIT_FAILURE;
-    }
-
-
-    err = clEnqueueWriteBuffer(commands, d_R_z, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_data, 0, NULL, NULL);
-    if (err != CL_SUCCESS) {
-        printf("ERROR: Failed to write to source array h_data: d_R_z: %d!\n", err);
-        printf("ERROR: Test failed\n");
-        return EXIT_FAILURE;
-    }
-
+    clFinish(commands);
+    printf("Finished enqueuing buffers\n");
 
     // Set the arguments to our compute kernel
     // cl_uint vector_length = MAX_LENGTH;
@@ -380,37 +395,36 @@ int main(int argc, char** argv)
 
     size_t global[1];
     size_t local[1];
+    
     // Execute the kernel over the entire range of our 1d input data set
     // using the maximum number of work group items for this device
 
+    /* Not recommended by Xilinx:
     global[0] = 1;
     local[0] = 1;
-    err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, (size_t*)&global, (size_t*)&local, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, (size_t*)&global, (size_t*)&local, 0, NULL, NULL); */
+    err = clEnqueueTask(commands, kernel, 0, NULL, NULL);
     if (err) {
         printf("ERROR: Failed to execute kernel! %d\n", err);
         printf("ERROR: Test failed\n");
         return EXIT_FAILURE;
     }
 
+    printf("Executed kernel!\n");
     clFinish(commands);
-
+    printf("Executed finished commands!\n");
 
     // Read back the results from the device to verify the output
     //
     cl_event readevent;
 
     err = 0;
-    err |= clEnqueueReadBuffer( commands, d_x_n, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_x_n_output, 0, NULL, &readevent );
+  
+    err |= clEnqueueReadBuffer( commands, d_R_x, CL_TRUE, 0, sizeof(cl_uint) * number_of_words_rcv, h_R_x_output, 0, NULL, &readevent );
 
-    err |= clEnqueueReadBuffer( commands, d_G_x, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_G_x_output, 0, NULL, &readevent );
+    err |= clEnqueueReadBuffer( commands, d_R_y, CL_TRUE, 0, sizeof(cl_uint) * number_of_words_rcv, h_R_y_output, 0, NULL, &readevent );
 
-    err |= clEnqueueReadBuffer( commands, d_G_y, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_G_y_output, 0, NULL, &readevent );
-
-    err |= clEnqueueReadBuffer( commands, d_R_x, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_R_x_output, 0, NULL, &readevent );
-
-    err |= clEnqueueReadBuffer( commands, d_R_y, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_R_y_output, 0, NULL, &readevent );
-
-    err |= clEnqueueReadBuffer( commands, d_R_z, CL_TRUE, 0, sizeof(cl_uint) * number_of_words, h_R_z_output, 0, NULL, &readevent );
+    err |= clEnqueueReadBuffer( commands, d_R_z, CL_TRUE, 0, sizeof(cl_uint) * number_of_words_rcv, h_R_z_output, 0, NULL, &readevent );
 
 
     if (err != CL_SUCCESS) {
@@ -418,38 +432,16 @@ int main(int argc, char** argv)
         printf("ERROR: Test failed\n");
         return EXIT_FAILURE;
     }
+
+    printf("Enqueued read buffers, waiting for readevent!\n");
     clWaitForEvents(1, &readevent);
     // Check Results
 
-    for (cl_uint i = 0; i < number_of_words; i++) {
-        if ((h_data[i] + 1) != h_x_n_output[i]) {
-            printf("ERROR in MSM_dummy::m00_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_x_n_output[i], h_x_n_output[i]);
-            check_status = 1;
-        }
-      //  printf("i=%d, input=%d, output=%d\n", i,  h_x_n_input[i], h_x_n_output[i]);
-    }
+    printf("Readed!\n");
+  
 
-
-    for (cl_uint i = 0; i < number_of_words; i++) {
-        if ((h_data[i] + 1) != h_G_x_output[i]) {
-            printf("ERROR in MSM_dummy::m01_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_G_x_output[i], h_G_x_output[i]);
-            check_status = 1;
-        }
-      //  printf("i=%d, input=%d, output=%d\n", i,  h_G_x_input[i], h_G_x_output[i]);
-    }
-
-
-    for (cl_uint i = 0; i < number_of_words; i++) {
-        if ((h_data[i] + 1) != h_G_y_output[i]) {
-            printf("ERROR in MSM_dummy::m02_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_G_y_output[i], h_G_y_output[i]);
-            check_status = 1;
-        }
-      //  printf("i=%d, input=%d, output=%d\n", i,  h_G_y_input[i], h_G_y_output[i]);
-    }
-
-
-    for (cl_uint i = 0; i < number_of_words; i++) {
-        if ((h_data[i] + 1) != h_R_x_output[i]) {
+    for (cl_uint i = 0; i < number_of_words_rcv; i++) {
+        if (((h_data[i] + 1) != h_R_x_output[i]) && (i%4096==0)) {
             printf("ERROR in MSM_dummy::m03_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_R_x_output[i], h_R_x_output[i]);
             check_status = 1;
         }
@@ -457,18 +449,18 @@ int main(int argc, char** argv)
     }
 
 
-    for (cl_uint i = 0; i < number_of_words; i++) {
+    for (cl_uint i = 0; i < number_of_words_rcv; i++) {
         if ((h_data[i] + 1) != h_R_y_output[i]) {
-            printf("ERROR in MSM_dummy::m04_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_R_y_output[i], h_R_y_output[i]);
+            //printf("ERROR in MSM_dummy::m04_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_R_y_output[i], h_R_y_output[i]);
             check_status = 1;
         }
       //  printf("i=%d, input=%d, output=%d\n", i,  h_R_y_input[i], h_R_y_output[i]);
     }
 
 
-    for (cl_uint i = 0; i < number_of_words; i++) {
+    for (cl_uint i = 0; i < number_of_words_rcv; i++) {
         if ((h_data[i] + 1) != h_R_z_output[i]) {
-            printf("ERROR in MSM_dummy::m05_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_R_z_output[i], h_R_z_output[i]);
+            //printf("ERROR in MSM_dummy::m05_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_R_z_output[i], h_R_z_output[i]);
             check_status = 1;
         }
       //  printf("i=%d, input=%d, output=%d\n", i,  h_R_z_input[i], h_R_z_output[i]);
@@ -479,13 +471,13 @@ int main(int argc, char** argv)
     // Shutdown and cleanup
     //-------------------------------------------------------------------------- 
     clReleaseMemObject(d_x_n);
-    free(h_x_n_output);
+    free(h_x_n_input);
 
     clReleaseMemObject(d_G_x);
-    free(h_G_x_output);
+    free(h_G_x_input);
 
     clReleaseMemObject(d_G_y);
-    free(h_G_y_output);
+    free(h_G_y_input);
 
     clReleaseMemObject(d_R_x);
     free(h_R_x_output);

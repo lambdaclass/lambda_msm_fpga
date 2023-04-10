@@ -220,12 +220,10 @@ always @(posedge ap_clk) begin
     ap_done_r <= '0;
   end
   else begin
-    ap_done_r <= (ap_done) ? '0 : ap_done_r | ap_done_i;
+    ap_done_r <= (ap_done); //? '0 : ap_done_r | ap_done_i;
   end
 end
 
-// TODO: Reomve
-//assign ap_done = &ap_done_r;
 
 // Ready Logic (non-pipelined case)
 assign ap_ready = ap_done;
