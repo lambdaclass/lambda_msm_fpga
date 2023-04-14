@@ -22,23 +22,28 @@ architecture Structural of FSM_w_counter is
         
 
 begin
+
         process(clk, rst, counter)
         begin
                 if(rst = '1') then
                         counter <= (others => '0');
+                        out_top_v <= '0';
                 elsif(clk'event and clk = '1' ) then 
 
                         if (in_count = '1') then
                                 if (counter = K - 1) then
-                                        counter <= (others => '0');
+                                        counter <= counter + 1;
                                         out_top_v <= '1';
+                                elsif (counter = K) then
+                                        counter <= (others => '0');
+                                        out_top_v <= '0';
                                 else
                                         counter <= counter + 1;
                                         out_top_v <= '0';
                                 end if;
                         else
                                 counter <= counter;
-                                out_top_v <= '0';
+                                out_top_v <= out_top_v;
                         end if;
 
                 end if;

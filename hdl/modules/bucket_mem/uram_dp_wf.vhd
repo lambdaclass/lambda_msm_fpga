@@ -1,6 +1,10 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.tipos.all;
+use work.config.all;
+use work.funciones.all;
+
 
 entity uram_dp_wf is
   generic (
@@ -26,13 +30,7 @@ end uram_dp_wf;
 
 architecture rtl of uram_dp_wf is
 
-  constant C_AWIDTH : integer := AWIDTH;
-  constant C_DWIDTH : integer := DWIDTH;
-  
-  -- Internal Signals
-  type mem_t is array(natural range<>) of std_logic_vector(C_DWIDTH-1 downto 0);
-  
-  shared variable mem : mem_t(2**C_AWIDTH-1 downto 0);  -- Memory Declaration
+  shared variable mem : mem_t(2**C_AWIDTH-1 downto 0) := fill_mem(4096);
   
   attribute ram_style : string;
   attribute ram_style of mem : variable is "ultra";
@@ -40,8 +38,19 @@ architecture rtl of uram_dp_wf is
   attribute cascade_height : integer;
   attribute cascade_height of mem : variable is 16; 
   
+
+  -- Senial definida unicamente para etapa de simulacion.
+  signal memory_dump : mem_t(2**C_AWIDTH - 1 downto 0);
+
 begin
   
+        process(clk)
+        begin
+                if rising_edge(clk) then
+                        memory_dump <= mem;
+                end if;
+        end process;
+
   -- Port B
   process(clk)
   begin

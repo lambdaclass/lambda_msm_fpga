@@ -39,10 +39,13 @@ architecture Structural of addr_selection is
         signal s_km             : std_logic_vector(C - 1 downto 0);
         signal s_km_b           : std_logic_vector(C - 1 downto 0);
 
-        signal g_k              : std_logic_vector(C - 1 downto 0);
+        signal g_k              : std_logic_vector(C - 1 downto 0) := zeros(C);
         signal g_km             : std_logic_vector(C - 1 downto 0);
 
         signal bl               : std_logic_vector(C - 1 downto 0);
+        signal top_bl           : std_logic_vector(C - 1 downto 0) := (others => '1');
+        signal top_m            : unsigned(ceil2power(M_sel - 1) - 1 downto 0) := (others => '1');
+        signal top_u            : unsigned(ceil2power(U_sel - 1) - 1 downto 0) := (others => '1');
 begin
 
         x_n_ext(x_n'length - 1 downto 0) <= x_n;
@@ -53,14 +56,18 @@ begin
          array_xn_k(i)<=x_n_ext((i+1)*C-1 downto C*i);
     end generate;
 
-        g_k         <= std_logic_vector(to_unsigned(0, C) + unsigned(K));
-        s_k         <= std_logic_vector(to_unsigned(22, C) + unsigned(K));
-        g_km        <= std_logic_vector(to_unsigned(44, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(M) + unsigned(M));
-        s_km        <= std_logic_vector(to_unsigned(198, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(M) + unsigned(M));
-        s_km_b      <= std_logic_vector(to_unsigned(198, C) + to_unsigned(K_sel, ceil2power(K_sel))*(unsigned(M) + 1) + (unsigned(M) + 1)); -- Duditas
+        s_k         <= std_logic_vector(to_unsigned(176, C) + unsigned(K));
+        g_km        <= std_logic_vector(to_unsigned(176, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(M) + unsigned(K));
 
-        bl <= M & U;
--------------------------
+        s_km        <= std_logic_vector(to_unsigned(0, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(M) + unsigned(K));
+        s_km_b      <= std_logic_vector(to_unsigned(0, C) + to_unsigned(K_sel, ceil2power(K_sel))*(unsigned(M) + 1) + (unsigned(M) + 1)); 
+
+
+        process(bl, M, U)
+        begin
+                bl <= std_logic_vector(top_m - unsigned(M)) & std_logic_vector(unsigned(top_u) - unsigned(U));
+        end process;
+
         process(select_addr_B, bl, s_km_b, s_k, g_km, s_km)
         begin
                 case select_addr_B is
@@ -73,7 +80,6 @@ begin
         end process;
 
         -- Para el loop 1, vas a entrar con el x_n red y con la direccion calculada.
-
 
         process(select_loop, array_xn_k, K, intermediate_L2)
         begin
