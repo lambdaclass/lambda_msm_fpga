@@ -162,7 +162,11 @@ timeprecision 1ps;
 // Local Parameters
 ///////////////////////////////////////////////////////////////////////////////
 // Large enough for interesting traffic.
-localparam integer  LP_DEFAULT_LENGTH_IN_BYTES = 16384;
+localparam integer  LP_DEFAULT_LENGTH_IN_BYTES = 2048; //16384;
+localparam integer  XFER_SIZE_FROM_HOST = 8192; //131072;
+localparam integer  LOG_XFER_SIZE_FROM_HOST = $clog2(XFER_SIZE_FROM_HOST);
+localparam integer  XFER_SIZE_TO_HOST = 2048; //65536;
+localparam integer  LOG_XFER_SIZE_TO_HOST = $clog2(XFER_SIZE_TO_HOST);
 localparam integer  LP_NUM_EXAMPLES    = 6;
 localparam integer  CE_XFER_SIZE_WIDTH = C_M00_AXI_DATA_WIDTH;
 localparam integer  CV_XFER_SIZE_WIDTH = C_M01_AXI_DATA_WIDTH;
@@ -180,8 +184,12 @@ logic                                ap_start_pulse                ;
 logic [LP_NUM_EXAMPLES-1:0]          ap_done_i                     ;
 logic [LP_NUM_EXAMPLES-1:0]          ap_done_r                      = {LP_NUM_EXAMPLES{1'b0}};
 logic [32-1:0]                       ctrl_xfer_size_in_bytes        = LP_DEFAULT_LENGTH_IN_BYTES;
+logic [64-1:0]                       ctrl_xfer_size_fh_in_bytes     ;//= XFER_SIZE_FROM_HOST;
+logic [64-1:0]                       ctrl_xfer_size_th_in_bytes     = XFER_SIZE_TO_HOST;
 logic [32-1:0]                       ctrl_constant                  = 32'd1;
 
+assign ctrl_xfer_size_fh_in_bytes = {{26{1'b0}}, n, {6{1'b0}}}; // n: number of points, 64 bytes per coordinate.
+ 
 ///////////////////////////////////////////////////////////////////////////////
 // Begin RTL
 ///////////////////////////////////////////////////////////////////////////////
@@ -238,8 +246,8 @@ msm_axis_wrapper #(
     .M(8)
 )
 msm_axis_wrapper_inst (
-    .clk  ( ap_clk ),
-    .rst  ( areset ),
+    .clk  ( ap_clk  ),
+    .rst  ( areset  ),
     .done ( ap_done ),
     //.m ( ctrl_constant ), // TODO: implement
     .s00_axis_tdata  ( s00_axis_tdata  ),
@@ -294,11 +302,11 @@ logic                          write_done;
 
 // AXI4 Read Master, output format is an AXI4-Stream master, one stream per thread.
 MSM_axi_read_master #(
-  .C_M_AXI_ADDR_WIDTH  ( C_M00_AXI_ADDR_WIDTH   ),
-  .C_M_AXI_DATA_WIDTH  ( C_M00_AXI_DATA_WIDTH   ),
-  .C_XFER_SIZE_WIDTH   ( CE_XFER_SIZE_WIDTH     ),
-  .C_MAX_OUTSTANDING   ( LP0_RD_MAX_OUTSTANDING ),
-  .C_INCLUDE_DATA_FIFO ( 1                      )
+  .C_M_AXI_ADDR_WIDTH  ( C_M00_AXI_ADDR_WIDTH    ),
+  .C_M_AXI_DATA_WIDTH  ( C_M00_AXI_DATA_WIDTH    ),
+  .C_XFER_SIZE_WIDTH   ( C_M00_AXI_ADDR_WIDTH    ),//CE_XFER_SIZE_WIDTH     ),
+  .C_MAX_OUTSTANDING   ( LP0_RD_MAX_OUTSTANDING  ),
+  .C_INCLUDE_DATA_FIFO ( 1                       )
 )
 inst_axi_read_master_01 (
   .aclk                    ( ap_clk                  ) ,
@@ -306,7 +314,7 @@ inst_axi_read_master_01 (
   .ctrl_start              ( ap_start_pulse          ) ,
   .ctrl_done               (                         ) ,  // Not used
   .ctrl_addr_offset        ( x_n                     ) ,
-  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_in_bytes ) ,
+  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_fh_in_bytes ) ,
   .m_axi_arvalid           ( m00_axi_arvalid         ) ,
   .m_axi_arready           ( m00_axi_arready         ) ,
   .m_axi_araddr            ( m00_axi_araddr          ) ,
@@ -322,6 +330,15 @@ inst_axi_read_master_01 (
   .m_axis_tlast            ( s00_axis_tlast          ) ,
   .m_axis_tdata            ( s00_axis_tdata          )
 );
+
+assign m00_axi_awvalid = 1'b0;
+assign m00_axi_wvalid = 1'b0;
+assign m00_axi_bready = 1'b0;
+assign m00_axi_wlast = 1'b0;
+assign m00_axi_wdata = {C_M00_AXI_DATA_WIDTH {1'b0}};
+assign m00_axi_wstrb = {C_M00_AXI_DATA_WIDTH/8 {1'b0}};
+assign m00_axi_awaddr = {C_M00_AXI_ADDR_WIDTH {1'b0}};
+assign m00_axi_awlen = {C_M00_AXI_ADDR_WIDTH/8 {1'b0}};
 
 //////////////////////////////
 // Port 1 is Input only to MSM
@@ -350,11 +367,11 @@ logic [C_M01_AXI_DATA_WIDTH-1:0] s01_axis_tdata;
 
 // AXI4 Read Master, output format is an AXI4-Stream master, one stream per thread.
 MSM_axi_read_master #(
-  .C_M_AXI_ADDR_WIDTH  ( C_M01_AXI_ADDR_WIDTH   ) ,
-  .C_M_AXI_DATA_WIDTH  ( C_M01_AXI_DATA_WIDTH   ) ,
-  .C_XFER_SIZE_WIDTH   ( CV_XFER_SIZE_WIDTH     ) ,
-  .C_MAX_OUTSTANDING   ( LP1_RD_MAX_OUTSTANDING ) ,
-  .C_INCLUDE_DATA_FIFO ( 1                      )
+  .C_M_AXI_ADDR_WIDTH  ( C_M01_AXI_ADDR_WIDTH    ) ,
+  .C_M_AXI_DATA_WIDTH  ( C_M01_AXI_DATA_WIDTH    ) ,
+  .C_XFER_SIZE_WIDTH   ( C_M01_AXI_ADDR_WIDTH    ) , //CV_XFER_SIZE_WIDTH     ) ,
+  .C_MAX_OUTSTANDING   ( LP1_RD_MAX_OUTSTANDING  ) ,
+  .C_INCLUDE_DATA_FIFO ( 1                       )
 )
 inst_axi_read_master_02 (
   .aclk                    ( ap_clk                  ) ,
@@ -362,7 +379,7 @@ inst_axi_read_master_02 (
   .ctrl_start              ( ap_start_pulse          ) ,
   .ctrl_done               (                         ) ,  // Not used
   .ctrl_addr_offset        ( G_x                     ) ,
-  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_in_bytes ) ,
+  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_fh_in_bytes ) ,
   .m_axi_arvalid           ( m01_axi_arvalid         ) ,
   .m_axi_arready           ( m01_axi_arready         ) ,
   .m_axi_araddr            ( m01_axi_araddr          ) ,
@@ -378,6 +395,15 @@ inst_axi_read_master_02 (
   .m_axis_tlast            ( s01_axis_tlast          ) ,
   .m_axis_tdata            ( s01_axis_tdata          )
 );
+
+assign m01_axi_awvalid = 1'b0;
+assign m01_axi_wvalid = 1'b0;
+assign m01_axi_bready = 1'b0;
+assign m01_axi_wlast = 1'b0;
+assign m01_axi_wdata = {C_M01_AXI_DATA_WIDTH {1'b0}};
+assign m01_axi_wstrb = {C_M01_AXI_DATA_WIDTH/8 {1'b0}};
+assign m01_axi_awaddr = {C_M01_AXI_ADDR_WIDTH {1'b0}};
+assign m01_axi_awlen = {C_M01_AXI_ADDR_WIDTH/8 {1'b0}};
 
 //////////////////////////////
 // Port 2 is Input only to MSM
@@ -405,11 +431,11 @@ logic [C_M02_AXI_DATA_WIDTH-1:0] s02_axis_tdata;
 
 // AXI4 Read Master, output format is an AXI4-Stream master, one stream per thread.
 MSM_axi_read_master #(
-  .C_M_AXI_ADDR_WIDTH  ( C_M02_AXI_ADDR_WIDTH   ) ,
-  .C_M_AXI_DATA_WIDTH  ( C_M02_AXI_DATA_WIDTH   ) ,
-  .C_XFER_SIZE_WIDTH   ( CV_XFER_SIZE_WIDTH     ) ,
-  .C_MAX_OUTSTANDING   ( LP2_RD_MAX_OUTSTANDING ) ,
-  .C_INCLUDE_DATA_FIFO ( 1                      )
+  .C_M_AXI_ADDR_WIDTH  ( C_M02_AXI_ADDR_WIDTH    ) ,
+  .C_M_AXI_DATA_WIDTH  ( C_M02_AXI_DATA_WIDTH    ) ,
+  .C_XFER_SIZE_WIDTH   ( C_M02_AXI_ADDR_WIDTH    ), //CV_XFER_SIZE_WIDTH     ) ,
+  .C_MAX_OUTSTANDING   ( LP2_RD_MAX_OUTSTANDING  ) ,
+  .C_INCLUDE_DATA_FIFO ( 1                       )
 )
 inst_axi_read_master_03 (
   .aclk                    ( ap_clk                  ) ,
@@ -417,7 +443,7 @@ inst_axi_read_master_03 (
   .ctrl_start              ( ap_start_pulse          ) ,
   .ctrl_done               (                         ) ,  // Not used
   .ctrl_addr_offset        ( G_y                     ) ,
-  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_in_bytes ) ,
+  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_fh_in_bytes ) ,
   .m_axi_arvalid           ( m02_axi_arvalid         ) ,
   .m_axi_arready           ( m02_axi_arready         ) ,
   .m_axi_araddr            ( m02_axi_araddr          ) ,
@@ -433,6 +459,15 @@ inst_axi_read_master_03 (
   .m_axis_tlast            ( s02_axis_tlast          ) ,
   .m_axis_tdata            ( s02_axis_tdata          )
 );
+
+assign m02_axi_awvalid = 1'b0;
+assign m02_axi_wvalid = 1'b0;
+assign m02_axi_bready = 1'b0;
+assign m02_axi_wlast = 1'b0;
+assign m02_axi_wdata = {C_M02_AXI_DATA_WIDTH {1'b0}};
+assign m02_axi_wstrb = {C_M02_AXI_DATA_WIDTH/8 {1'b0}};
+assign m02_axi_awaddr = {C_M02_AXI_ADDR_WIDTH {1'b0}};
+assign m02_axi_awlen = {C_M02_AXI_ADDR_WIDTH/8 {1'b0}};
 
 /////////////////////////////////
 // Port 3 is Output only from MSM
@@ -458,7 +493,7 @@ logic [C_M03_AXI_DATA_WIDTH-1:0] m00_axis_tdata;
 MSM_axi_write_master #(
   .C_M_AXI_ADDR_WIDTH  ( C_M03_AXI_ADDR_WIDTH  ) ,
   .C_M_AXI_DATA_WIDTH  ( C_M03_AXI_DATA_WIDTH  ) ,
-  .C_XFER_SIZE_WIDTH   ( CV_XFER_SIZE_WIDTH    ) ,
+  .C_XFER_SIZE_WIDTH   ( C_M03_AXI_ADDR_WIDTH  ) ,//CV_XFER_SIZE_WIDTH    ) ,
   .C_MAX_OUTSTANDING   ( LP_WR_MAX_OUTSTANDING ) ,
   .C_INCLUDE_DATA_FIFO ( 1                     )
 )
@@ -468,7 +503,7 @@ inst_axi_write_master_01 (
   .ctrl_start              ( ap_start                ) ,
   .ctrl_done               (                         ) , // Not used
   .ctrl_addr_offset        ( R_x                     ) ,
-  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_in_bytes ) ,
+  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_th_in_bytes ) ,
   .m_axi_awvalid           ( m03_axi_awvalid         ) ,
   .m_axi_awready           ( m03_axi_awready         ) ,
   .m_axi_awaddr            ( m03_axi_awaddr          ) ,
@@ -486,6 +521,11 @@ inst_axi_write_master_01 (
   .s_axis_tready           ( m00_axis_tready         ) ,  // Not used
   .s_axis_tdata            ( m00_axis_tdata          )
 );
+
+assign m03_axi_arvalid = 1'b0;
+assign m03_axi_rready = 1'b0;
+assign m03_axi_araddr = {C_M03_AXI_ADDR_WIDTH {1'b0}};
+assign m03_axi_arlen = {C_M03_AXI_ADDR_WIDTH/8 {1'b0}};
 
 /////////////////////////////////
 // Port 4 is Output only from MSM
@@ -506,7 +546,7 @@ logic [C_M04_AXI_DATA_WIDTH-1:0] m01_axis_tdata;
 MSM_axi_write_master #(
   .C_M_AXI_ADDR_WIDTH  ( C_M04_AXI_ADDR_WIDTH  ) ,
   .C_M_AXI_DATA_WIDTH  ( C_M04_AXI_DATA_WIDTH  ) ,
-  .C_XFER_SIZE_WIDTH   ( CV_XFER_SIZE_WIDTH    ) ,
+  .C_XFER_SIZE_WIDTH   ( C_M04_AXI_ADDR_WIDTH  ), //CV_XFER_SIZE_WIDTH    ) ,
   .C_MAX_OUTSTANDING   ( LP_WR_MAX_OUTSTANDING ) ,
   .C_INCLUDE_DATA_FIFO ( 1                     )
 )
@@ -516,7 +556,7 @@ inst_axi_write_master_02 (
   .ctrl_start              ( ap_start                ) ,
   .ctrl_done               (                         ) , // Not used
   .ctrl_addr_offset        ( R_y                     ) ,
-  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_in_bytes ) ,
+  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_th_in_bytes ) ,
   .m_axi_awvalid           ( m04_axi_awvalid         ) ,
   .m_axi_awready           ( m04_axi_awready         ) ,
   .m_axi_awaddr            ( m04_axi_awaddr          ) ,
@@ -534,6 +574,11 @@ inst_axi_write_master_02 (
   .s_axis_tready           ( m01_axis_tready         ) ,  // Not used
   .s_axis_tdata            ( m01_axis_tdata          )
 );
+
+assign m04_axi_arvalid = 1'b0;
+assign m04_axi_rready = 1'b0;
+assign m04_axi_araddr = {C_M04_AXI_ADDR_WIDTH {1'b0}};
+assign m04_axi_arlen = {C_M04_AXI_ADDR_WIDTH/8 {1'b0}};
 
 /////////////////////////////////
 // Port 5 is Output only from MSM
@@ -554,7 +599,7 @@ logic [C_M05_AXI_DATA_WIDTH-1:0] m02_axis_tdata;
 MSM_axi_write_master #(
   .C_M_AXI_ADDR_WIDTH  ( C_M05_AXI_ADDR_WIDTH  ) ,
   .C_M_AXI_DATA_WIDTH  ( C_M05_AXI_DATA_WIDTH  ) ,
-  .C_XFER_SIZE_WIDTH   ( CV_XFER_SIZE_WIDTH    ) ,
+  .C_XFER_SIZE_WIDTH   ( C_M05_AXI_ADDR_WIDTH  ), //CV_XFER_SIZE_WIDTH    ) ,
   .C_MAX_OUTSTANDING   ( LP_WR_MAX_OUTSTANDING ) ,
   .C_INCLUDE_DATA_FIFO ( 1                     )
 )
@@ -564,7 +609,7 @@ inst_axi_write_master_03 (
   .ctrl_start              ( ap_start                ) ,
   .ctrl_done               (                         ) , // Not used
   .ctrl_addr_offset        ( R_z                     ) ,
-  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_in_bytes ) ,
+  .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_th_in_bytes ) ,
   .m_axi_awvalid           ( m05_axi_awvalid         ) ,
   .m_axi_awready           ( m05_axi_awready         ) ,
   .m_axi_awaddr            ( m05_axi_awaddr          ) ,
@@ -582,6 +627,11 @@ inst_axi_write_master_03 (
   .s_axis_tready           ( m02_axis_tready         ) ,  // Not used
   .s_axis_tdata            ( m02_axis_tdata          )
 );
+
+assign m05_axi_arvalid = 1'b0;
+assign m05_axi_rready = 1'b0;
+assign m05_axi_araddr = {C_M05_AXI_ADDR_WIDTH {1'b0}};
+assign m05_axi_arlen = {C_M05_AXI_ADDR_WIDTH/8 {1'b0}};
 
 endmodule : MSM_mm_wrapper
 `default_nettype wire
