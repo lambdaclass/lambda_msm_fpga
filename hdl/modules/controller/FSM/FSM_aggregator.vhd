@@ -14,11 +14,11 @@ entity FSM_aggregator is
                 log_done                : in std_logic;
                 padd_datavalid          : in std_logic;
 
-                addr_A_read_out         : out std_logic_vector(1 downto 0);
+                addr_A_read_out         : out std_logic_vector(2 downto 0);
                 addr_B_read_out         : out std_logic_vector(2 downto 0);
 
                 data_A_select           : out std_logic_vector(1 downto 0);
-                data_B_select           : out std_logic_vector(1 downto 0);
+                data_B_select           : out std_logic_vector(2 downto 0);
 
                 k_next                  : out std_logic;
                 u_next                  : out std_logic;
@@ -27,13 +27,19 @@ entity FSM_aggregator is
 
                 -- Tiene los 4 bits de control. Los 3 menos signif corresponden a las escrituras en cada componente de memoria. 
                 -- El mas significativo es un data valid.
-                padd_status_out         : out std_logic_vector(3 downto 0)
+                padd_status_out         : out std_logic_vector(3 downto 0);
+
+                bucket_address_sel      : out std_logic;
+                mem_address_sel         : out std_logic;
+                aux_address_sel         : out std_logic;
+
+                aggregation_done        : out std_logic
 );
 end FSM_aggregator;
 
 architecture Structural of FSM_aggregator is
 
-        type pa_op1_input is (G_K, G_KM, S_K, S_KM);
+        type pa_op1_input is (G_K, G_KM, S_K, S_KM,S_SKM);
         type pa_op2_input is (BUCKET, S_K, S_KM, S_KM_MINUS, G_KM);
 
         type states_loop is (idle, read_gs_km, read_seg_bucket, change_segment, change_element, change_to_acc, read_skskm, read_gkgkm, change_segment_b, read_skmb, read_sklog, read_wait, read_gs, wait_for_padd, endState);
@@ -115,31 +121,46 @@ begin
 
                 addr_A_read_out <= (others => '0');
                 addr_B_read_out <= (others => '0');
-
                 padd_status_out <= (others => '0');
+
+                bucket_address_sel <= '0';
+                mem_address_sel    <= '0';
+                aux_address_sel    <= '0';
+
+                data_A_select     <= "00"; 
+                data_B_select     <= "000"; 
+                aggregation_done   <= '0';
 
                 case state_reg is
                         when idle =>
                         when read_gs_km =>
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(G_K), addr_A_read_out'length));
+                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(G_KM), addr_A_read_out'length));
                                 addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_KM), addr_B_read_out'length));
 
                                 data_A_select <= "10";
-                                data_B_select <= "01";
+                                data_B_select <= "010";
 
                                 k_next <= '1';
                                 -- Escribo en aux
                                 padd_status_out <= "1001";
+
+                                aux_address_sel <= '0';
+                                mem_address_sel <= '1';
+
                         when read_seg_bucket =>
                                 addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(S_KM), addr_A_read_out'length));
                                 addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(BUCKET), addr_B_read_out'length));
 
                                 data_A_select <= "01";
-                                data_B_select <= "00";
+                                data_B_select <= "000";
 
                                 k_next <= '1';
                                 -- Escribo en aux y segmento
                                 padd_status_out <= "1011";
+
+                                mem_address_sel <= '0';
+                                bucket_address_sel <= '1';
+
                         when change_segment =>
                                 m_next <= '1';
                         when change_element =>
@@ -150,21 +171,29 @@ begin
                                 addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_KM), addr_B_read_out'length));
 
                                 data_A_select <= "01";
-                                data_B_select <= "10";
+                                data_B_select <= "100";
 
                                 k_next <= '1';
                                 -- Escribo en bucket y segmento
                                 padd_status_out <= "1110";
+
+                                mem_address_sel <= '0';
+                                aux_address_sel <= '1';
+
                         when read_gkgkm => 
                                 addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(G_K), addr_A_read_out'length));
                                 addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(G_KM), addr_B_read_out'length));
 
                                 data_A_select <= "00";
-                                data_B_select <= "10";
+                                data_B_select <= "100";
 
                                 k_next <= '1';
                                 -- Escribo en bucket 
                                 padd_status_out <= "1101";
+
+                                aux_address_sel <= '0';
+                                bucket_address_sel <= '1';
+
                         when change_segment_b =>
                                 m_next <= '1';
                         when read_skmb =>
@@ -172,17 +201,21 @@ begin
                                 addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_KM_MINUS), addr_B_read_out'length));
 
                                 data_A_select <= "01";
-                                data_B_select <= "10";
+                                data_B_select <= "100";
 
                                 k_next <= '1';
                                 -- Escribo en aux y segmento
                                 padd_status_out <= "1011";
+
+                                aux_address_sel <= '0';
+                                mem_address_sel <= '1';
+
                         when read_sklog =>
                                 addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(S_K), addr_A_read_out'length));
                                 addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_K), addr_B_read_out'length));
 
                                 data_A_select <= "01";
-                                data_B_select <= "00";
+                                data_B_select <= "000";
 
                                 k_next <= '1';
                                 -- Escribo en bucket y segmento
@@ -192,19 +225,28 @@ begin
                                 else
                                         log_next <=  '0';
                                 end if;
+
+                                mem_address_sel <= '0';
+                                bucket_address_sel <= '1';
+
                         when read_wait =>
                         when read_gs =>
                                 addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(G_K), addr_A_read_out'length));
                                 addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_K), addr_B_read_out'length));
 
                                 data_A_select <= "00";
-                                data_B_select <= "01";
+                                data_B_select <= "001";
 
                                 k_next <= '1';
                                 -- Escribo en bucket
                                 padd_status_out <= "1100";
+
+                                bucket_address_sel <= '0';
+                                aux_address_sel <= '1';
+
                         when wait_for_padd =>
                         when endState =>
+                                aggregation_done <= '1';
                 end case;
         end process;
 

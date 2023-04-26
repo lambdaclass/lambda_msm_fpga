@@ -6,8 +6,8 @@ use ieee.std_logic_1164.all;
 --* Es parametrizable el ancho de palabra WORD_WIDTH
 entity delay_M is
   generic (
-    WORD_WIDTH : natural;
-    DELAY      : natural
+    WORD_WIDTH : natural := 15;
+    DELAY      : natural := 5
     );
   port (
     clk       : in  std_logic;

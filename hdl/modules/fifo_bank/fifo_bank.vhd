@@ -62,14 +62,14 @@ begin
             FULL_RESET_VALUE    => 0,       -- DECIMAL
             PROG_EMPTY_THRESH   => 3,       -- DECIMAL
             PROG_FULL_THRESH    => 10,      -- DECIMAL
-            RD_DATA_COUNT_WIDTH => 1,       -- DECIMAL
+            RD_DATA_COUNT_WIDTH => 5,       -- DECIMAL
             READ_DATA_WIDTH     => DWIDTH,  -- DECIMAL
             READ_MODE           => "std",   -- String
             SIM_ASSERT_CHK      => 0,       -- DECIMAL; 0=disable simulation messages, 1=enable simulation messages
             USE_ADV_FEATURES    => "0707",  -- String
             WAKEUP_TIME         => 0,       -- DECIMAL
             WRITE_DATA_WIDTH    => DWIDTH,  -- DECIMAL
-            WR_DATA_COUNT_WIDTH => 1        -- DECIMAL
+            WR_DATA_COUNT_WIDTH => 5        -- DECIMAL
             )
         port map (
             almost_empty    => open,

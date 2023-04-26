@@ -48,6 +48,9 @@ package funciones is
    --* Construye un elemento de tres coordenadas de tipo point_t
   function to_point_t_threeCoords(V : std_logic_vector) 
    return point_t;
+   --* Construye una memoria de tipo mem_t y la rellena con valores hasta cierto rango.
+  function fill_mem(N : natural) 
+   return mem_t;
 
 end package;
 
@@ -636,6 +639,26 @@ end to_point_t;
 
     return p;
 end to_point_t_threeCoords;
+
+------------------------------------------------------------------------
+
+  function fill_mem(N : natural) return mem_t is
+
+    variable memory : mem_t(2**C_AWIDTH - 1 downto 0);
+    variable data_line : std_logic_vector(C_DWIDTH - 1 downto 0);
+
+  begin
+
+        for i in 0 to N - 1 loop
+                memory(i) := (memory(i)'length - 1 downto 3*N_vect => '0') & std_logic_vector(to_unsigned(i, N_vect)) & std_logic_vector(to_unsigned(i, N_vect)) & std_logic_vector(to_unsigned(1, N_vect));
+        end loop;
+
+        for i in N to 4095 loop
+                memory(i) := (others => '0');
+        end loop;
+
+    return memory;
+end fill_mem;
 
 ------------------------------------------------------------------------
 

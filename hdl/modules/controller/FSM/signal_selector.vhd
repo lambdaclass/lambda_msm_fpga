@@ -7,7 +7,7 @@ use work.tipos.ALL;
 use work.config.ALL;
 
 entity signal_selector is
-        generic(K : natural := 5);
+        generic(K : natural := 22);
         port(
                 -- Input --
                 w_value                 : in std_logic_vector(ceil2power(K) - 1 downto 0);

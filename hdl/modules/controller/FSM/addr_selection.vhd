@@ -14,12 +14,12 @@ entity addr_selection is
                  C     : natural := 12);
         port ( 
                 x_n             : in std_logic_vector(N_esc - 1 downto 0);
+                fifo_xn         : in std_logic_vector(C - 1 downto 0);
                 K               : in std_logic_vector(ceil2power(K_sel) - 1 downto 0);
                 U               : in std_logic_vector(ceil2power(U_sel - 1) - 1 downto 0);
                 M               : in std_logic_vector(ceil2power(M_sel - 1) - 1 downto 0);
 
-                select_loop     : in std_logic;
-                select_addr_A   : in std_logic_vector(1 downto 0);
+                select_addr_A   : in std_logic_vector(2 downto 0);
                 select_addr_B   : in std_logic_vector(2 downto 0);
                 
                 address_out_A   : out std_logic_vector(C - 1 downto 0);
@@ -33,6 +33,7 @@ architecture Structural of addr_selection is
         signal array_xn_k       : array_xn(K_sel -1 downto 0);
 
         signal x_n_ext          : std_logic_vector(K_sel*C - 1 downto 0) := zeros(K_sel*C);
+        signal intermediate_L1  : std_logic_vector(C - 1 downto 0);
         signal intermediate_L2  : std_logic_vector(C - 1 downto 0);
 
         signal s_k              : std_logic_vector(C - 1 downto 0);
@@ -49,12 +50,11 @@ architecture Structural of addr_selection is
 begin
 
         x_n_ext(x_n'length - 1 downto 0) <= x_n;
-    -- Scalar to FIFO bank    
-    -- Connect scalar to MUX for scalar reduced  
-    U0_CONNECTIONS: for i in 0 to K_sel-1 generate
-    begin
-         array_xn_k(i)<=x_n_ext((i+1)*C-1 downto C*i);
-    end generate;
+
+        U0_CONNECTIONS: for i in 0 to K_sel-1 generate
+        begin
+             array_xn_k(i)<=x_n_ext((i+1)*C-1 downto C*i);
+        end generate;
 
         s_k         <= std_logic_vector(to_unsigned(176, C) + unsigned(K));
         g_km        <= std_logic_vector(to_unsigned(176, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(M) + unsigned(K));
@@ -81,21 +81,16 @@ begin
 
         -- Para el loop 1, vas a entrar con el x_n red y con la direccion calculada.
 
-        process(select_loop, array_xn_k, K, intermediate_L2)
-        begin
-                case select_loop is
-                        when '0'    => address_out_A <= array_xn_k(to_integer(unsigned(K))); 
-                        when others => address_out_A <= intermediate_L2; 
-                end case;
-        end process;
 
-        process(select_addr_A, g_k, s_k, g_km, s_km)
+        process(select_addr_A, g_k, s_k, g_km, s_km, K)
         begin
                 case select_addr_A is
-                        when "00"   => intermediate_L2 <= g_k;
-                        when "01"   => intermediate_L2 <= g_km;
-                        when "10"   => intermediate_L2 <= s_k;
-                        when others => intermediate_L2 <= s_km;
+                        when "000"   => address_out_A <= array_xn_k(to_integer(unsigned(K)));
+                        when "001"   => address_out_A <= fifo_xn;
+                        when "010"   => address_out_A <= g_k;
+                        when "011"   => address_out_A <= g_km;
+                        when "100"   => address_out_A <= s_k;
+                        when others  => address_out_A <= s_km;
                 end case;
         end process;
 

@@ -22,4 +22,8 @@ package tipos is
   type point_t is 
     array(natural range<>) of std_logic_vector(N_vect - 1 downto 0);
 
+  type mem_t is 
+    array(natural range<>) of std_logic_vector(C_DWIDTH - 1 downto 0);
+
+
 end package;
