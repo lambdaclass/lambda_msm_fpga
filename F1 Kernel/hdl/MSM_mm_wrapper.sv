@@ -1,4 +1,3 @@
-// This is a generated file. Use and modify at your own risk.
 //////////////////////////////////////////////////////////////////////////////// 
 // default_nettype of none prevents implicit wire declaration.
 `default_nettype none
@@ -162,13 +161,13 @@ timeprecision 1ps;
 // Local Parameters
 ///////////////////////////////////////////////////////////////////////////////
 // Large enough for interesting traffic.
-localparam integer  LP_DEFAULT_LENGTH_IN_BYTES = 2048; //16384;
-localparam integer  XFER_SIZE_FROM_HOST = 8192; //131072;
+//localparam integer  LP_DEFAULT_LENGTH_IN_BYTES = 2048; //16384;
+localparam integer  XFER_SIZE_FROM_HOST = 8192 * 64; // 8192 points of 64 bytes per coordinate;
 localparam integer  LOG_XFER_SIZE_FROM_HOST = $clog2(XFER_SIZE_FROM_HOST);
-localparam integer  XFER_SIZE_TO_HOST = 2048; //65536;
+localparam integer  XFER_SIZE_TO_HOST = 22 * 64; // 22 points of 64 bytes per coordinate; TODO: define U and propagate the parameter.
 localparam integer  LOG_XFER_SIZE_TO_HOST = $clog2(XFER_SIZE_TO_HOST);
 localparam integer  LP_NUM_EXAMPLES    = 6;
-localparam integer  CE_XFER_SIZE_WIDTH = C_M00_AXI_DATA_WIDTH;
+localparam integer  CE_XFER_SIZE_WIDTH = C_M01_AXI_DATA_WIDTH;
 localparam integer  CV_XFER_SIZE_WIDTH = C_M01_AXI_DATA_WIDTH;
 
 
@@ -183,12 +182,14 @@ logic                                ap_idle_r                      = 1'b1;
 logic                                ap_start_pulse                ;
 logic [LP_NUM_EXAMPLES-1:0]          ap_done_i                     ;
 logic [LP_NUM_EXAMPLES-1:0]          ap_done_r                      = {LP_NUM_EXAMPLES{1'b0}};
-logic [32-1:0]                       ctrl_xfer_size_in_bytes        = LP_DEFAULT_LENGTH_IN_BYTES;
-logic [64-1:0]                       ctrl_xfer_size_fh_in_bytes     ;//= XFER_SIZE_FROM_HOST;
+logic                                ap_done_read                  ;
+logic                                ap_done_data                  ;
+logic                                ap_done_msm                   ;
+//logic [32-1:0]                       ctrl_xfer_size_in_bytes        = LP_DEFAULT_LENGTH_IN_BYTES;
+logic [64-1:0]                       ctrl_xfer_size_fh_in_bytes     = XFER_SIZE_FROM_HOST;
 logic [64-1:0]                       ctrl_xfer_size_th_in_bytes     = XFER_SIZE_TO_HOST;
 logic [32-1:0]                       ctrl_constant                  = 32'd1;
 
-assign ctrl_xfer_size_fh_in_bytes = {{26{1'b0}}, n, {6{1'b0}}}; // n: number of points, 64 bytes per coordinate.
  
 ///////////////////////////////////////////////////////////////////////////////
 // Begin RTL
@@ -228,13 +229,16 @@ always @(posedge ap_clk) begin
     ap_done_r <= '0;
   end
   else begin
-    ap_done_r <= (ap_done); //? '0 : ap_done_r | ap_done_i;
+    ap_done_r <= (ap_done) ? '0 : ap_done_r | ap_done_i;
   end
 end
 
+// TODO: Reomve
+//assign ap_done = &ap_done_r;
 
 // Ready Logic (non-pipelined case)
-assign ap_ready = ap_done;
+assign ap_done = ap_done_data | ap_done_read;
+assign ap_ready = ap_done; //ap_done_read;
 
 /////////////////////////////////////////////
 // MSM IP Core
@@ -248,7 +252,7 @@ msm_axis_wrapper #(
 msm_axis_wrapper_inst (
     .clk  ( ap_clk  ),
     .rst  ( areset  ),
-    .done ( ap_done ),
+    .done ( ap_done_msm ),
     //.m ( ctrl_constant ), // TODO: implement
     .s00_axis_tdata  ( s00_axis_tdata  ),
     .s00_axis_tvalid ( s00_axis_tvalid ),
@@ -377,7 +381,7 @@ inst_axi_read_master_02 (
   .aclk                    ( ap_clk                  ) ,
   .areset                  ( areset                  ) ,
   .ctrl_start              ( ap_start_pulse          ) ,
-  .ctrl_done               (                         ) ,  // Not used
+  .ctrl_done               ( ap_done_read            ) ,  // Not used
   .ctrl_addr_offset        ( G_x                     ) ,
   .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_fh_in_bytes ) ,
   .m_axi_arvalid           ( m01_axi_arvalid         ) ,
@@ -501,7 +505,7 @@ inst_axi_write_master_01 (
   .aclk                    ( ap_clk                  ) ,
   .areset                  ( areset                  ) ,
   .ctrl_start              ( ap_start                ) ,
-  .ctrl_done               (                         ) , // Not used
+  .ctrl_done               ( ap_done_data            ) , // Not used
   .ctrl_addr_offset        ( R_x                     ) ,
   .ctrl_xfer_size_in_bytes ( ctrl_xfer_size_th_in_bytes ) ,
   .m_axi_awvalid           ( m03_axi_awvalid         ) ,

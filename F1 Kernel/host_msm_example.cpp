@@ -1,13 +1,18 @@
 #include <iostream>
 #include <stdlib.h>
+#include <vector>
 #include "xcl2.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
-#define MAX_LENGTH (4096 << 4) // 4096 points; 16 cl_uints per coordinate
-#define RCV_LENGTH (256 << 4)  // 256 points; 16 cl_uints per coordinate
+#define MAX_LENGTH (8192 * 16) // 4096 points per transfer; 16 cl_uints per coordinate
+#define RCV_LENGTH (22 * 16)   // 22 points; 16 cl_uints per coordinate
 #define MEM_ALIGNMENT 4096
 
-
+void flush_commands(cl_event event, cl_int cmd_status, void* commands){
+	printf("Flushing command queue...\n");
+	((cl::CommandQueue*)commands)->flush();
+	printf("Flush done!\n");
+}
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv)
@@ -17,14 +22,14 @@ int main(int argc, char** argv)
     cl_uint check_status = 0;
     const cl_uint number_of_words_sent = MAX_LENGTH; //
     const cl_uint number_of_words_rcv = RCV_LENGTH;
+    const unsigned points_to_process = 16384;
+	int iterations = (points_to_process * 16) /MAX_LENGTH;
 
     cl::Context context;          // compute context
     cl::CommandQueue commands;    // compute command queue
     cl::Kernel kernel;            // compute kernel
 
-    cl_uint* h_data;              // host memory for input vector
-
-    cl_uint* h_x_n_input = (cl_uint*)aligned_alloc(MEM_ALIGNMENT, MAX_LENGTH * sizeof(cl_uint*)); // host memory for input vector of scalars
+    cl_uint* h_x_n_input = (cl_uint*)aligned_alloc(MEM_ALIGNMENT, MAX_LENGTH/2 * sizeof(cl_uint*)); // host memory for input vector of scalars
     cl_uint* h_G_x_input = (cl_uint*)aligned_alloc(MEM_ALIGNMENT, MAX_LENGTH * sizeof(cl_uint*)); // host memory for input vector of X coordinate
     cl_uint* h_G_y_input = (cl_uint*)aligned_alloc(MEM_ALIGNMENT, MAX_LENGTH * sizeof(cl_uint*)); // host memory for input vector of Y coordinate
     cl_uint* h_R_x_output = (cl_uint*)aligned_alloc(MEM_ALIGNMENT, RCV_LENGTH * sizeof(cl_uint*)); // host memory for output vector of X coordinate
@@ -38,22 +43,19 @@ int main(int argc, char** argv)
     char *xclbin = argv[1];
 
     // Fill our data sets with pattern
-    h_data = (cl_uint*)aligned_alloc(MEM_ALIGNMENT,MAX_LENGTH * sizeof(cl_uint*));
-
-    for(cl_uint i = 0; i < (MAX_LENGTH); i++) {
-        h_x_n_input[i] = 0;
+    for(cl_uint i = 0; i < (MAX_LENGTH/2); i++) {
+        h_x_n_input[i] = i;
     }
 
     for(cl_uint i = 0; i < MAX_LENGTH; i++) {
-        h_data[i]  = i;
-        h_G_x_input[i] = 0; 
-        h_G_y_input[i] = 0; 
+        h_G_x_input[i] = i;
+        h_G_y_input[i] = i;
     }
     
     for(cl_uint i = 0; i < RCV_LENGTH; i++) {
-        h_R_x_output[i] = 0xFF; 
-        h_R_y_output[i] = 0xFF; 
-        h_R_z_output[i] = 0xFF; 
+        h_R_x_output[i] = 0xFFFFFF00;
+        h_R_y_output[i] = 0xFFFFFF00;
+        h_R_z_output[i] = 0xFFFFFF00;
     }
 
 
@@ -77,7 +79,7 @@ int main(int argc, char** argv)
             std::cout << "Failed to program device[" << i << "] with xclbin file!\n";
         } else {
             std::cout << "Device[" << i << "]: program successful!\n";
-            OCL_CHECK(err, kernel = cl::Kernel(program, "MSM_dummy", &err));
+            OCL_CHECK(err, kernel = cl::Kernel(program, "MSM_testing", &err));
             valid_device = true;
             break; // we break because we found a valid device
         }
@@ -88,57 +90,74 @@ int main(int argc, char** argv)
     }
 
     // Setup ChipScope
-    printf("\nPress ENTER to continue after setting up ILA trigger...");
-    getc(stdin);
+    // printf("\nPress ENTER to continue after setting up ILA trigger...");
+    // getc(stdin);
+
+    std::vector<cl::Event> wait_list;
+    std::vector<cl::Event> write_event(1);
+    cl::Buffer d_x_n[2], d_G_x[2], d_G_y[2];
+
+	// Allocate Buffer in Global Memory
+	// Buffers are allocated using CL_MEM_USE_HOST_PTR for efficient memory and Device-to-host communication
+	// Results are read in a single transaction
+	OCL_CHECK(err, cl::Buffer d_R_x(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(cl_uint) * number_of_words_rcv,
+									h_R_x_output, &err));
+	OCL_CHECK(err, cl::Buffer d_R_y(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(cl_uint) * number_of_words_rcv,
+									h_R_y_output, &err));
+	OCL_CHECK(err, cl::Buffer d_R_z(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(cl_uint) * number_of_words_rcv,
+									h_R_z_output, &err));
 
 
-    // Allocate Buffer in Global Memory
-    // Buffers are allocated using CL_MEM_USE_HOST_PTR for efficient memory and
-    // Device-to-host communication
-    OCL_CHECK(err, cl::Buffer d_x_n(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_uint) * number_of_words_sent,//vector_size_bytes,
-    							    h_x_n_input, &err));
-    OCL_CHECK(err, cl::Buffer d_G_x(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_uint) * number_of_words_sent,//vector_size_bytes,
-    								h_G_x_input, &err));
-    OCL_CHECK(err, cl::Buffer d_G_y(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_uint) * number_of_words_sent,//vector_size_bytes,
-                 				    h_G_y_input, &err));
-    OCL_CHECK(err, cl::Buffer d_R_x(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(cl_uint) * number_of_words_rcv,//vector_size_bytes,
-                                    h_R_x_output, &err));
-    OCL_CHECK(err, cl::Buffer d_R_y(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(cl_uint) * number_of_words_rcv,//vector_size_bytes,
-                                    h_R_y_output, &err));
-    OCL_CHECK(err, cl::Buffer d_R_z(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY, sizeof(cl_uint) * number_of_words_rcv,//vector_size_bytes,
-                                    h_R_z_output, &err));
+	int tag;
+	printf("Iterations to transfer data to kernel: %d\n", iterations);
+    for (int i=0; i<iterations; i++){
+   		tag = i%2; // For double buffering
+   		printf("Transferring data to Kernel... pass %d\n", i);
+
+   		// Data is sent using double buffering
+		OCL_CHECK(err, d_x_n[tag] = cl::Buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_uint) * number_of_words_sent/2,
+										h_x_n_input, &err));
+		OCL_CHECK(err, d_G_x[tag] = cl::Buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_uint) * number_of_words_sent,
+										h_G_x_input, &err));
+		OCL_CHECK(err, d_G_y[tag] = cl::Buffer(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_uint) * number_of_words_sent,
+										h_G_y_input, &err));
 
 
-    // Set the arguments to our compute kernel
-    err = 0;
-    int size = MAX_LENGTH;
-    OCL_CHECK(err, err = kernel.setArg(0, size));
-    OCL_CHECK(err, err = kernel.setArg(1, d_x_n));
-    OCL_CHECK(err, err = kernel.setArg(2, d_G_x));
-    OCL_CHECK(err, err = kernel.setArg(3, d_G_y));
-    OCL_CHECK(err, err = kernel.setArg(4, d_R_x));
-    OCL_CHECK(err, err = kernel.setArg(5, d_R_y));
-    OCL_CHECK(err, err = kernel.setArg(6, d_R_z));
+		// Set the arguments to our compute kernel
+		err = 0;
+		int size = MAX_LENGTH;
+		OCL_CHECK(err, err = kernel.setArg(0, size));
+		OCL_CHECK(err, err = kernel.setArg(1, d_x_n[tag]));
+		OCL_CHECK(err, err = kernel.setArg(2, d_G_x[tag]));
+		OCL_CHECK(err, err = kernel.setArg(3, d_G_y[tag]));
+		OCL_CHECK(err, err = kernel.setArg(4, d_R_x));
+		OCL_CHECK(err, err = kernel.setArg(5, d_R_y));
+		OCL_CHECK(err, err = kernel.setArg(6, d_R_z));
 
 
-    if (err != CL_SUCCESS) {
-        printf("ERROR: Failed to set kernel arguments! %d\n", err);
-        printf("ERROR: Test failed\n");
-        return EXIT_FAILURE;
+		if (err != CL_SUCCESS) {
+			printf("ERROR: Failed to set kernel arguments! %d\n", err);
+			printf("ERROR: Test failed\n");
+			return EXIT_FAILURE;
+		}
+
+		// Copy input data to device global memory
+		OCL_CHECK(err, err = commands.enqueueMigrateMemObjects({d_x_n[tag], d_G_x[tag], d_G_y[tag]}, 0 /* 0 means from host*/,
+																nullptr, &write_event[0]));
+
+		wait_list.push_back(write_event[0]);
+		//cl::Finish(commands);
+		printf("Finished enqueueing buffers\n");
+
+		// Launch kernel
+		OCL_CHECK(err, err = commands.enqueueTask(kernel, &wait_list));
+		printf("Launched kernel!\n");
+		wait_list.pop_back();
     }
-
-    // Copy input data to device global memory
-    OCL_CHECK(err, err = commands.enqueueMigrateMemObjects({d_x_n, d_G_x, d_G_y}, 0 /* 0 means from host*/));
-
-    //cl::Finish(commands);
-    printf("Finished enqueuing buffers\n");
-
-    // Launch kernel
-    OCL_CHECK(err, err = commands.enqueueTask(kernel));
-    printf("Launched kernel!\n");
+    OCL_CHECK(err, err = commands.finish());
+    printf("Kernel done...\n");
 
     err = 0;
-
     // Copy results from device to host local memory
     OCL_CHECK(err, err = commands.enqueueMigrateMemObjects({d_R_x,d_R_y,d_R_z}, CL_MIGRATE_MEM_OBJECT_HOST));
 
@@ -155,11 +174,21 @@ int main(int argc, char** argv)
     // Check Results
 
     for (cl_uint i = 0; i < number_of_words_rcv; i++) {
-        if (((h_data[i] + 1) != h_R_x_output[i])&& (i%4096==0)) {
-            printf("ERROR in MSM_dummy::m03_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_R_x_output[i], h_R_x_output[i]);
-            check_status = 1;
+    	if (i%16 == 0){
+    		printf("MSM_dummy::m03_axi - array index %d (host addr 0x%03x) - output=%d (0x%x)\n", i, i*4, h_R_x_output[i], h_R_x_output[i]);
+    		if ((h_R_x_output[i] & 0x01F) != i>>4){
+    			check_status = 1;
+    			printf("Error in Rx output!!!\n");
+    		}
+    		if ((h_R_y_output[i] & 0x01F) != i>>4){
+    		    check_status = 1;
+    		    printf("Error in Ry output!!!\n");
+    		}
+    		if ((h_R_z_output[i] & 0x01F) != i>>4){
+    			check_status = 1;
+    		    printf("Error in Rz output!!!\n");
+    		}
         }
-      //  printf("i=%d, input=%d, output=%d\n", i,  h_R_x_input[i], h_R_x_output[i]);
     }
 
     //--------------------------------------------------------------------------
@@ -183,9 +212,6 @@ int main(int argc, char** argv)
     //clReleaseMemObject(d_R_z);
     free(h_R_z_output);
 
-
-
-    free(h_data);
     //clReleaseProgram(program);
     //clReleaseKernel(kernel);
     //clReleaseCommandQueue(commands);
@@ -198,8 +224,4 @@ int main(int argc, char** argv)
         printf("INFO: Test completed successfully.\n");
         return EXIT_SUCCESS;
     }
-
-
 } // end of main
-
-

@@ -42,8 +42,8 @@ architecture Structural of msm_architecture is
         signal input_vector     : std_logic_vector(3*N_vect - 1 downto 0);
         signal G_z              : std_logic_vector(N_vect-1 downto 0) := zeros(N_vect - 1) & to_slv('1');
 
-        constant M_in  : natural := 16#40_00_00_00#; -- 2 ** 26
-        constant M_out : natural := 256;
+        constant M_in  : natural := 16384;  --16#40_00_00_00#; -- 2 ** 26
+        constant M_out : natural := 22;
 
         signal all_data_received : std_logic;
         signal all_data_sent     : std_logic;
@@ -92,9 +92,9 @@ begin
               max_o       => all_data_sent
               );
 
-        x   <= zeros(x'length - data_count'length) & data_count;
-        y   <= zeros(x'length - data_count'length) & data_count;
-        z   <= zeros(x'length - data_count'length) & data_count;
+        x   <= G_x(G_x'length-1 downto data_count'length) & data_count;
+        y   <= G_y(G_y'length-1 downto data_count'length) & data_count;
+        z   <= G_z(G_z'length-1 downto data_count'length) & data_count;
 
         data_valid <= run_out_counter;
         done <= run_out_counter and all_data_sent;
