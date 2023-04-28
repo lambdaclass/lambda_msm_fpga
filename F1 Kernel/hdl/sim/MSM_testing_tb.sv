@@ -10,8 +10,8 @@ import slv_m02_axi_vip_pkg::*;
 import slv_m03_axi_vip_pkg::*;
 import slv_m04_axi_vip_pkg::*;
 import slv_m05_axi_vip_pkg::*;
-import control_MSM_vip_pkg::*;
-module MSM_tb ();
+import control_MSM_testing_vip_pkg::*;
+module MSM_testing_tb ();
 parameter integer LP_MAX_LENGTH = 8192;
 parameter integer LP_MAX_TRANSFER_LENGTH = 16384 / 4;
 parameter integer C_S_AXI_CONTROL_ADDR_WIDTH = 12;
@@ -373,7 +373,7 @@ inst_dut (
 );
 
 // Master Control instantiation
-control_MSM_vip inst_control_MSM_vip (
+control_MSM_testing_vip inst_control_MSM_testing_vip (
   .aclk          ( ap_clk                ),
   .aresetn       ( ap_rst_n              ),
   .m_axi_awvalid ( s_axi_control_awvalid ),
@@ -395,7 +395,7 @@ control_MSM_vip inst_control_MSM_vip (
   .m_axi_bresp   ( s_axi_control_bresp   )
 );
 
-control_MSM_vip_mst_t  ctrl;
+control_MSM_testing_vip_mst_t  ctrl;
 
 // Slave MM VIP instantiation
 slv_m00_axi_vip inst_slv_m00_axi_vip (
@@ -799,37 +799,37 @@ task automatic start_vips();
 
   $display("///////////////////////////////////////////////////////////////////////////");
   $display("Control Master: ctrl");
-  ctrl = new("ctrl", MSM_tb.inst_control_MSM_vip.inst.IF);
+  ctrl = new("ctrl", MSM_testing_tb.inst_control_MSM_testing_vip.inst.IF);
   ctrl.start_master();
 
   $display("///////////////////////////////////////////////////////////////////////////");
   $display("Starting Memory slave: m00_axi");
-  m00_axi = new("m00_axi", MSM_tb.inst_slv_m00_axi_vip.inst.IF);
+  m00_axi = new("m00_axi", MSM_testing_tb.inst_slv_m00_axi_vip.inst.IF);
   m00_axi.start_slave();
 
   $display("///////////////////////////////////////////////////////////////////////////");
   $display("Starting Memory slave: m01_axi");
-  m01_axi = new("m01_axi", MSM_tb.inst_slv_m01_axi_vip.inst.IF);
+  m01_axi = new("m01_axi", MSM_testing_tb.inst_slv_m01_axi_vip.inst.IF);
   m01_axi.start_slave();
 
   $display("///////////////////////////////////////////////////////////////////////////");
   $display("Starting Memory slave: m02_axi");
-  m02_axi = new("m02_axi", MSM_tb.inst_slv_m02_axi_vip.inst.IF);
+  m02_axi = new("m02_axi", MSM_testing_tb.inst_slv_m02_axi_vip.inst.IF);
   m02_axi.start_slave();
 
   $display("///////////////////////////////////////////////////////////////////////////");
   $display("Starting Memory slave: m03_axi");
-  m03_axi = new("m03_axi", MSM_tb.inst_slv_m03_axi_vip.inst.IF);
+  m03_axi = new("m03_axi", MSM_testing_tb.inst_slv_m03_axi_vip.inst.IF);
   m03_axi.start_slave();
 
   $display("///////////////////////////////////////////////////////////////////////////");
   $display("Starting Memory slave: m04_axi");
-  m04_axi = new("m04_axi", MSM_tb.inst_slv_m04_axi_vip.inst.IF);
+  m04_axi = new("m04_axi", MSM_testing_tb.inst_slv_m04_axi_vip.inst.IF);
   m04_axi.start_slave();
 
   $display("///////////////////////////////////////////////////////////////////////////");
   $display("Starting Memory slave: m05_axi");
-  m05_axi = new("m05_axi", MSM_tb.inst_slv_m05_axi_vip.inst.IF);
+  m05_axi = new("m05_axi", MSM_testing_tb.inst_slv_m05_axi_vip.inst.IF);
   m05_axi.start_slave();
 
 endtask
