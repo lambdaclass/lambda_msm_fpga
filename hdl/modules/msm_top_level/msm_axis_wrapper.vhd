@@ -34,17 +34,17 @@ entity msm_axis_wrapper is
         -- AXI-Stream Master Outputs
         -- R_x
         m00_axis_tdata   : out std_logic_vector(N_vect_axi - 1 downto 0);
-        m00_axis_tready  : out std_logic;
+        m00_axis_tready  : in  std_logic;
         m00_axis_tvalid  : out std_logic;
 
         -- R_y
         m01_axis_tdata   : out std_logic_vector(N_vect_axi - 1 downto 0);
-        m01_axis_tready  : out std_logic;
+        m01_axis_tready  : in  std_logic;
         m01_axis_tvalid  : out std_logic;
 
         -- R_z
         m02_axis_tdata   : out std_logic_vector(N_vect_axi - 1 downto 0);
-        m02_axis_tready  : out std_logic;
+        m02_axis_tready  : in  std_logic;
         m02_axis_tvalid  : out std_logic;
         done             : out std_logic;
         -- System Clock and Reset
@@ -83,16 +83,19 @@ begin
             x_n => s00_axis_tdata(N_esc-1 downto 0),
             G_x => s01_axis_tdata(N_vect-1 downto 0),
             G_y => s02_axis_tdata(N_vect-1 downto 0),
-            fifo_input_we => s00_axis_tvalid,
+            fifo_input_we => s01_axis_tvalid,
             x => m00_axis_tdata(N_vect-1 downto 0),
             y => m01_axis_tdata(N_vect-1 downto 0),
             z => m02_axis_tdata(N_vect-1 downto 0),
             data_valid  => data_valid,
             done  => done
         );
-
+        
+    m00_axis_tdata(N_vect_axi-1 downto N_vect) <= (others =>'0');
     m00_axis_tvalid <= data_valid;
+    m01_axis_tdata(N_vect_axi-1 downto N_vect) <= (others =>'0');
     m01_axis_tvalid <= data_valid;
+    m02_axis_tdata(N_vect_axi-1 downto N_vect) <= (others =>'0');
     m02_axis_tvalid <= data_valid;
 
 end architecture;

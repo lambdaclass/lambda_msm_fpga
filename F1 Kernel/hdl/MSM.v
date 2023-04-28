@@ -263,10 +263,9 @@ inst_control_s_axi (
 );
 
 ///////////////////////////////////////////////////////////////////////////////
-// Add kernel logic here.  Modify/remove example code as necessary.
+// Kernel logic.
 ///////////////////////////////////////////////////////////////////////////////
 
-// Example RTL block.  Remove to insert custom logic.
 MSM_mm_wrapper #(
   .C_M00_AXI_ADDR_WIDTH ( C_M00_AXI_ADDR_WIDTH ),
   .C_M00_AXI_DATA_WIDTH ( C_M00_AXI_DATA_WIDTH ),
@@ -281,7 +280,7 @@ MSM_mm_wrapper #(
   .C_M05_AXI_ADDR_WIDTH ( C_M05_AXI_ADDR_WIDTH ),
   .C_M05_AXI_DATA_WIDTH ( C_M05_AXI_DATA_WIDTH )
 )
-inst_example (
+MSM_inst (
   .ap_clk          ( ap_clk          ),
   .ap_rst_n        ( ap_rst_n        ),
   .m00_axi_awvalid ( m00_axi_awvalid ),
