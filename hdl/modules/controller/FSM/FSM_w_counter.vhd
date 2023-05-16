@@ -22,7 +22,6 @@ architecture Structural of FSM_w_counter is
         
 
 begin
-
         process(clk, rst, counter)
         begin
                 if(rst = '1') then
@@ -43,7 +42,6 @@ begin
                                 end if;
                         else
                                 counter <= counter;
-                                out_top_v <= out_top_v;
                         end if;
 
                 end if;

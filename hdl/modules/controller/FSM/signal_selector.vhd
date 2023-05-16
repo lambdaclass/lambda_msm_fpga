@@ -9,20 +9,13 @@ use work.config.ALL;
 entity signal_selector is
         generic(K : natural := 22);
         port(
-                -- Input --
                 w_value                 : in std_logic_vector(ceil2power(K) - 1 downto 0);
 
-                bucket_kempty           : in std_logic_vector(K - 1 downto 0);
-                bucket_kbusy            : in std_logic_vector(K - 1 downto 0);
-                fifo_kfull              : in std_logic_vector(K - 1 downto 0);
-                fifo_kempty             : in std_logic_vector(K - 1 downto 0);
+                bucket_kstatus          : in bucket_kstatus;
+                fifo_bank_kstatus       : in fifo_bank_kstatus;
 
-
-                bucket_empty_b          : out std_logic;
-                bucket_busy_b           : out std_logic;
-                fifo_anyFull            : out std_logic;
-                fifo_allWithElem        : out std_logic;
-                fifo_k_empty            : out std_logic
+                fifo_bank_status        : out fifo_bank_status;
+                bucket_status           : out bucket_status
 );
 
 end signal_selector;
@@ -31,29 +24,29 @@ architecture Structural of signal_selector is
         
 begin
 
-        BUCKET_EMPTY_SIG : process(bucket_kempty, w_value)
+        BUCKET_EMPTY_SIG : process(bucket_kstatus, w_value)
         begin
-                bucket_empty_b <= bucket_kempty(to_integer(unsigned(w_value))); 
+                bucket_status.empty_o <= bucket_kstatus.empty_o(to_integer(unsigned(w_value))); 
         end process;
 
-        BUCKET_BUSY_SIG  : process(bucket_kbusy, w_value)
+        BUCKET_BUSY_SIG  : process(bucket_kstatus, w_value)
         begin
-                bucket_busy_b  <= bucket_kbusy(to_integer(unsigned(w_value))); 
+                bucket_status.busy_o <= bucket_kstatus.busy_o(to_integer(unsigned(w_value))); 
         end process;
 
-        FIFO_ANY_FULL_SIG  : process(fifo_kfull)
+        FIFO_ANY_FULL_SIG  : process(fifo_bank_kstatus)
         begin
-                fifo_anyFull     <= or fifo_kfull;
+                fifo_bank_status.fb_anyFull <= or fifo_bank_kstatus.fb_kfull;
         end process;
 
-        FIFO_ALL_W_ELEM_SIG  : process(fifo_kempty)
+        FIFO_ALL_W_ELEM_SIG  : process(fifo_bank_kstatus)
         begin
-                fifo_allWithElem <= and (not fifo_kempty);
+                fifo_bank_status.fb_allWithElem <= and (not fifo_bank_kstatus.fb_kempty);
         end process;
 
-        FIFO_K_EMPTY_SIG  : process(fifo_kempty, w_value)
+        FIFO_K_EMPTY_SIG  : process(fifo_bank_kstatus, w_value)
         begin
-                fifo_k_empty <= fifo_kempty(to_integer(unsigned(w_value)));
+                fifo_bank_status.fb_empty <= fifo_bank_kstatus.fb_kempty(to_integer(unsigned(w_value)));
         end process;
 
 end Structural;

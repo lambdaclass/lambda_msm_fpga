@@ -2,16 +2,15 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 use work.funciones.ALL;
-use work.tipos.ALL;
 use work.config.ALL;
+use work.tipos.ALL;
 
 entity controller is
         generic (K : natural := 22;
                  U : natural := 512;
+                 N : natural := 512;
                  M : natural := 8;
-                 SCALAR_SIZE : natural := 253;
-                 C : natural := 12;
-                 FIFO_WRITE_SIZE : natural := 16);
+                 C : natural := 12);
         port ( 
                 -----------------------
                 -------- INPUT --------
@@ -19,240 +18,252 @@ entity controller is
                 clk, rst        : in std_logic;
 
                 start_MSM       : in std_logic;
-
-                -- State values
-                busyb_in        : in std_logic_vector(K - 1 downto 0);
-                emptyb_in       : in std_logic_vector(K - 1 downto 0);
-                empty_fifo_in   : in std_logic_vector(K - 1 downto 0);
-                full_fifo_in    : in std_logic_vector(K - 1 downto 0);
-                
-                padd_dv_in      : in std_logic;
-                ------------------------
-                -------- OUTPUT --------
-                ------------------------
-
-                -- Todo esto es loop 1
-                w_value_out     : out std_logic_vector(ceil2power(K) - 1 downto 0);
-                m_value_out     : out std_logic_vector(ceil2power(M - 1) - 1 downto 0);
-                u_value_out     : out std_logic_vector(ceil2power(U - 1) - 1 downto 0);
-
-                fifo_re_out     : out std_logic;
-                fifo_we_out     : out std_logic;
-
-                bucket_web_out  : out std_logic;
-                bucket_emptyB   : out std_logic;
-                bucket_busyB    : out std_logic;
-
-                point_next      : out std_logic;
-                padd_status     : out std_logic_vector(3 downto 0);
-
+                data_valid_in   : in std_logic;
+                bucket_kstatus  : in bucket_kstatus;
+                fifo_bank_kstatus : in fifo_bank_kstatus;
 
                 -- Todo esto es loop 2
 
-                loop_process    : out std_logic; 
                 op_selector_A   : out std_logic_vector(1 downto 0);
-                op_selector_B   : out std_logic_vector(1 downto 0);
+                op_selector_B   : out std_logic_vector(2 downto 0);
 
-                addr_A_out      : out std_logic_vector(1 downto 0);
-                addr_B_out      : out std_logic_vector(2 downto 0);
+                addr_selector_A : out std_logic_vector(2 downto 0);
+                addr_selector_B : out std_logic_vector(2 downto 0);
 
-                -- Todo esto es loop 3
-                done            : out std_logic;
-                data_valid_out  : out std_logic
+                fifo_bank_we : out std_logic;
+                fifo_bank_re : out std_logic;
+                
+                bucket_status_o : out bucket_status;
+                bucket_web_o    : out std_logic;
+
+                bucket_address_sel      : out std_logic; 
+                mem_address_sel         : out std_logic; 
+                aux_address_sel         : out std_logic; 
+
+                counters_addr   : out counters;
+                padd_status_out : out padd_status;
+
+                input_next      : out std_logic;
+                output_we       : out std_logic
              );
 end controller;
 
 architecture Structural of controller is
 
-        -- Todas estas seniales son de contadores
+        signal in_count : count_signals;
+        signal counters : counters;
+        signal counter_status : counters_status;
 
-        signal window_value     : std_logic_vector(ceil2power(K) - 1 downto 0);
-        signal segment_value    : std_logic_vector(ceil2power(M - 1) - 1 downto 0);
-        signal element_value    : std_logic_vector(ceil2power(U - 1) - 1 downto 0);
-        signal log_value        : std_logic_vector(ceil2power(ceil2power(U - 1)) - 1 downto 0);
-        signal fifo_value       : std_logic_vector(ceil2power(FIFO_WRITE_SIZE) - 1 downto 0);
+        signal bucket_status : bucket_status;
+        signal fifo_bank_status : fifo_bank_status;
 
-        signal window_c_in      : std_logic;
-        signal segment_c_in     : std_logic;
-        signal element_c_in     : std_logic;
-        signal log_c_in         : std_logic;
-        signal fifo_c_in        : std_logic;
-        signal input_c_in       : std_logic;
-        signal padd_c_in        : std_logic;
+        signal bucket_web_tmp : std_logic;
 
-        signal w_count_done     : std_logic;
-        signal m_count_done     : std_logic;
-        signal u_count_done     : std_logic;
-        signal fifo_count_done  : std_logic;
-        signal log_count_done   : std_logic;
-        signal in_count_done    : std_logic;
-        signal padd_count_done  : std_logic;
+        signal start_L2 : std_logic;
+        signal start_L3 : std_logic;
+        signal MSM_done : std_logic;
 
-        -- Estas son del selector de seniales
-        signal bucket_empty_sig : std_logic;
-        signal bucket_busy_sig  : std_logic;
-        signal fifo_some_full   : std_logic;
-        signal fifo_all_element : std_logic;
-        signal fifo_k_empty_sig : std_logic;
+        signal w_next_l1 : std_logic;
+        signal w_next_l2 : std_logic;
+        signal w_next_l3 : std_logic;
 
+        signal data_A_select_L1 : std_logic_vector(1 downto 0); 
+        signal data_B_select_L1 : std_logic_vector(2 downto 0); 
+ 
+        signal data_A_select_L2 : std_logic_vector(1 downto 0); 
+        signal data_B_select_L2 : std_logic_vector(2 downto 0); 
 
-        -- Estas son del dispatch
-        signal fifo_write_en    : std_logic;
-        signal fifo_read_en     : std_logic;
+        signal loop_selection : std_logic_vector(1 downto 0);
 
-        signal bucket_write_en  : std_logic;
+        ----- Dudas -----
+        signal addr_A_select_L1 : std_logic_vector(2 downto 0) := (others => '0');
+        signal addr_B_select_L1 : std_logic_vector(2 downto 0) := (others => '0');
+        ----- Dudas -----
 
-        signal dispatch_done    : std_logic;
+        signal addr_A_select_L2 : std_logic_vector(2 downto 0);
+        signal addr_B_select_L2 : std_logic_vector(2 downto 0);
 
-        signal busyb_out        : std_logic;
-        signal emptyb_out       : std_logic;
-        signal padd_endprocess  : std_logic;
-
-        signal point_next_in    : std_logic;
-        signal points_in        : std_logic;
-        signal points_selection : std_logic;
-        signal points_processed : std_logic;
-        signal o_points_in      : std_logic;
-
-
-        signal point_adder_status_L1 : std_logic_vector(3 downto 0);
-        signal point_adder_status_L2 : std_logic_vector(3 downto 0);
-
-        signal op_selector_A_L1 : std_logic_vector(1 downto 0);
-        signal op_selector_A_L2 : std_logic_vector(1 downto 0);
-
-        signal op_selector_B_L1 : std_logic_vector(1 downto 0);
-        signal op_selector_B_L2 : std_logic_vector(1 downto 0);
-
+        signal padd_status_l1 : padd_status;
+        signal padd_status_l2 : padd_status;
 begin
 
         COUNTER_BANK : entity work.counter_bank
+                generic map(N => N)
                 port map(
                         clk              => clk, 
                         rst              => rst, 
 
-                        count_enable     => start_MSM,
+--                        count_enable     => start_MSM,
+                        padd_output     => data_valid_in,
+                        in_count         => in_count,
 
-                        in_w_count       => window_c_in, 
-                        in_m_count       => segment_c_in, 
-                        in_u_count       => element_c_in, 
-                        in_log_count     => log_c_in, 
-                        in_fifo_count    => fifo_c_in, 
-                        in_padd          => padd_dv_in, 
-        
-
-                        w_counter_out    => window_value, 
-                        m_counter_out    => segment_value, 
-                        u_counter_out    => element_value, 
-                        log_counter_out  => log_value, 
-                        fifo_counter_out => fifo_value, 
-                        
-                        w_count_done     => w_count_done, 
-                        m_count_done     => m_count_done, 
-                        u_count_done     => u_count_done, 
-                        log_count_done   => log_count_done, 
-                        fifo_count_done  => fifo_count_done, 
-                        padd_count_done  => padd_count_done, 
-                        input_count_done => in_count_done
+                        counters_values  => counters,
+                        counters_status  => counter_status
                 );
 
         SIGSEL: entity work.signal_selector
                 generic map(K => K)
                 port map(
-                        w_value                 => window_value,
+                        w_value                 => counters.window,
 
-                        bucket_kempty           => emptyb_in,
-                        bucket_kbusy            => busyb_in,
-                        fifo_kfull              => full_fifo_in,
-                        fifo_kempty             => empty_fifo_in,
+                        bucket_kstatus          => bucket_kstatus,
+                        fifo_bank_kstatus       => fifo_bank_kstatus,
 
-                        bucket_empty_b          => bucket_empty_sig,
-                        bucket_busy_b           => bucket_busy_sig,
-                        fifo_anyFull            => fifo_some_full,
-                        fifo_allWithElem        => fifo_all_element,
-                        fifo_k_empty            => fifo_k_empty_sig
+                        fifo_bank_status        => fifo_bank_status,
+                        bucket_status           => bucket_status
                 );
-                
-  --      ADDITION : entity work.FSM_addition
-  --              port map(
-  --                      clk                     => clk,
-  --                      rst                     => rst,
 
-  --                      bucket_read             => start_MSM,
-  --                      bucket_empty_bit        => bucket_empty_sig,
-  --                      bucket_busy_bit         => bucket_busy_sig,
-  --                      
-  --                      fifo_k_empty_bit        => fifo_k_empty_sig,
-  --                      fifo_anyFull_bit        => fifo_some_full,
-  --                      fifo_allWelem_bit       => fifo_all_element,
-  --                      
-  --                      window_done             => w_count_done,
-  --                      fifo_size_done          => fifo_count_done,
-  --                      input_done              => in_count_done,
-  --                      
-  --                      -- output
-  --                      fifo_we                 => fifo_we_out,
-  --                      fifo_re                 => fifo_re_out,
-  --                      fifo_next               => fifo_c_in,
+        ADDITION: entity work.FSM_addition
+                generic map(K => K)
+                port map(
+                        clk => clk,
+                        rst => rst,
 
-  --                      empty_bit_out           => bucket_emptyB,
-  --                      busy_bit_out            => bucket_busyB,
-  --                      bucket_web              => bucket_web_out,
-  --                      
-  --                      padd_datavalid          => padd_dv_out,
-  --                      point_next              => point_next,
+                        bucket_read => start_MSM,
+                        bucket_status => bucket_status,
+                        fifo_bank_status => fifo_bank_status,
 
-  --                      loop_done               => dispatch_done,
-  --                      op_selector_B           => op_selector_B_L1
-  --              );
+                        window_done => counter_status.status_w_done,
+                        fifo_done => counter_status.status_fifo_done,
+                        input_done => counter_status.status_input_done,
+                        padd_done => counter_status.status_padd_done,
 
+                        w_count         => w_next_l1,
+                        fifo_next       => in_count.fifo_count,
+                        point_next      => in_count.input_count,
 
-        AGGREGATOR : entity work.FSM_aggregator
-                port map ( 
-                        clk                => clk, 
-                        rst                => rst,
-                        
-                        aggregation_start  => dispatch_done,
+                        point_select => input_next,
 
-                        window_done        => w_count_done,
-                        segment_done       => m_count_done,
-                        elements_done      => u_count_done,
-                        log_done           => log_count_done,
-                        padd_datavalid     => padd_dv_in,
+                        fifo_we => fifo_bank_we,
+                        fifo_re => fifo_bank_re,
 
-                        addr_A_read_out    => addr_A_out,
-                        addr_B_read_out    => addr_B_out,
+                        empty_bit_out   => bucket_status_o.empty_o,
+                        busy_bit_out    => bucket_status_o.busy_o,
+                        bucket_web      => bucket_web_tmp,
 
-                        k_next             => window_c_in,
-                        u_next             => element_c_in,
-                        m_next             => segment_c_in,
-                        log_next           => log_c_in,
+                        padd_status_out => padd_status_l1,
+                        loop2_start => start_L2,
 
-                        padd_status_out    => point_adder_status_L2,
-                        data_A_select      => op_selector_A_L2,
-                        data_B_select      => op_selector_B_L2
+--                        addr_A_read_out        => open, 
+--                        addr_B_read_out        => open, 
+--
+                        data_A_select => data_A_select_L1,
+                        data_B_select => data_B_select_L1 
+                );
 
-        );
+        AGGREGATION: entity work.FSM_aggregator
+                port map(
+                        clk => clk,
+                        rst => rst,
 
-        loop_process    <= dispatch_done;
-        op_selector_A   <= op_selector_A_L1 when dispatch_done = '0' else
-                           op_selector_A_L2;
+                        aggregation_start       => start_L2,
 
-        op_selector_B   <= op_selector_B_L1 when dispatch_done = '0' else 
-                           op_selector_B_L2 ;
-                
+                        -- Status 
+                        window_done            => counter_status.status_w_done,
+                        segment_done           => counter_status.status_m_done,
+                        elements_done          => counter_status.status_u_done,
+                        log_done               => counter_status.status_log_done,
 
-        process(padd_status, dispatch_done)
+                        padd_datavalid         => data_valid_in,
+
+                        addr_A_read_out        => addr_A_select_L2, 
+                        addr_B_read_out        => addr_B_select_L2, 
+
+                        data_A_select          => data_A_select_L2, 
+                        data_B_select          => data_B_select_L2, 
+
+                        k_next                 => w_next_l2, 
+                        u_next                 => in_count.u_count, 
+                        m_next                 => in_count.m_count, 
+                        log_next               => in_count.log_count, 
+
+                        padd_status_out        => padd_status_l2, 
+
+                        bucket_address_sel     => bucket_address_sel, 
+                        mem_address_sel        => mem_address_sel, 
+                        aux_address_sel        => aux_address_sel, 
+
+                        aggregation_done       => start_L3
+                );
+        
+        bucket_web_o <= bucket_web_tmp;
+        in_count.padd_count <= data_valid_in or bucket_web_tmp;
+
+        TO_HOST: entity work.FSM_toHost
+                port map(
+                        clk => clk,
+                        rst => rst,
+                        dispatch_start => start_L3,
+                        window_done => counter_status.status_w_done,
+
+                        k_next => w_next_l3,
+                        output_fifo_we => output_we,
+                        done => MSM_done 
+                );
+
+        CHOOSE_FSM: entity work.FSM_output
+                port map(
+                        clk => clk,
+                        rst => rst,
+
+                        start_loop1 => start_MSM,
+                        start_loop2 => start_L2,
+                        start_loop3 => start_L3,
+
+                        done => MSM_done,
+
+                        choose_signals => loop_selection
+                );
+
+        counters_addr <= counters;
+
+        WINDOW_NEXT_ASSIGNMENT: process(loop_selection, w_next_l1, w_next_l2, w_next_l3, in_count)
         begin
-                padd_status <= point_adder_status_L2 when dispatch_done = '1' else
-                               point_adder_status_L1;
+                case loop_selection is
+                        when "00" =>   in_count.w_count  <= w_next_l1;
+                        when "01" =>   in_count.w_count  <= w_next_l2;
+                        when others => in_count.w_count  <= w_next_l3;
+                end case;
         end process;
 
-        w_value_out <= window_value;
-        m_value_out <= segment_value;
-        u_value_out <= element_value;
+        WRITE_DV_PADD: process(loop_selection, padd_status_l1, padd_status_l2)
+        begin
+                case loop_selection is
+                        when "00" =>   padd_status_out <= padd_status_l1;
+                        when others => padd_Status_out <= padd_status_l2;
+                end case;
+        end process;
 
-        data_valid_out <= '0';
-        done <= '0';
+        PADD_OPERAND_A : process(loop_selection, data_A_select_L1, data_A_select_L2)
+        begin
+                case loop_selection is
+                        when "00" =>   op_selector_A <= data_A_select_L1;
+                        when others => op_selector_A <= data_A_select_L2;
+                end case;
+        end process;
+
+        PADD_OPERAND_B : process(loop_selection, data_B_select_L1, data_B_select_L2)
+        begin
+                case loop_selection is
+                        when "00" =>   op_selector_B <= data_B_select_L1;
+                        when others => op_selector_B <= data_B_select_L2;
+                end case;
+        end process;
+
+        ADDR_A_SEL : process(loop_selection, addr_A_select_L1, addr_A_select_L2)
+        begin
+                case loop_selection is
+                        when "00" =>   addr_selector_A <= addr_A_select_L1;
+                        when others => addr_selector_A <= addr_A_select_L2;
+                end case;
+        end process;
+
+        ADDR_B_SEL : process(loop_selection, addr_B_select_L1, addr_B_select_L2)
+        begin
+                case loop_selection is
+                        when "00" =>   addr_selector_B <= addr_B_select_L1;
+                        when others => addr_selector_B <= addr_B_select_L2;
+                end case;
+        end process;
 
 end Structural;

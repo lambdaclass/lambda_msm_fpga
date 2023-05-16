@@ -12,7 +12,19 @@ package config is
        constant  K : natural := 22;  --K windows     
        constant  DSP_SIZE : natural := 18;
        constant  q: unsigned(N_vect-1 downto 0) := '1' & x"ae3a4617c510eac63b05c06ca1493b1a22d9f300f5138f1ef3622fba094800170b5d44300000008508c00000000001";
-   
+
+       -- Constantes definidas para uram.
+       constant  C_DWIDTH : natural := 1152;
+       constant  C_AWIDTH : natural := 12;
+
+        constant DWIDTH_BUCKET  : integer := 72*16;
+        constant DWIDTH_FIFO_B  : integer := 3*N_vect + c;
+        constant AWIDTH_BUCKET  : integer := N_esc;
+        constant FIFO_WRITE_SIZE : integer := 16;
+        --constant PACKAGE_SIZE : integer := ceil2power(K) + C + 3;
+        constant PACKAGE_SIZE : integer := 5 + C + 3;
+
+
 end package;
 
 package pipeline_cfg is

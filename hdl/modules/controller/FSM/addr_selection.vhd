@@ -15,9 +15,8 @@ entity addr_selection is
         port ( 
                 x_n             : in std_logic_vector(N_esc - 1 downto 0);
                 fifo_xn         : in std_logic_vector(C - 1 downto 0);
-                K               : in std_logic_vector(ceil2power(K_sel) - 1 downto 0);
-                U               : in std_logic_vector(ceil2power(U_sel - 1) - 1 downto 0);
-                M               : in std_logic_vector(ceil2power(M_sel - 1) - 1 downto 0);
+
+                counters        : in counters;
 
                 select_addr_A   : in std_logic_vector(2 downto 0);
                 select_addr_B   : in std_logic_vector(2 downto 0);
@@ -56,25 +55,26 @@ begin
              array_xn_k(i)<=x_n_ext((i+1)*C-1 downto C*i);
         end generate;
 
-        s_k         <= std_logic_vector(to_unsigned(176, C) + unsigned(K));
-        g_km        <= std_logic_vector(to_unsigned(176, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(M) + unsigned(K));
+        s_k         <= std_logic_vector(to_unsigned(176, C) + unsigned(counters.segment));
+        g_km        <= std_logic_vector(to_unsigned(176, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(counters.segment) + unsigned(counters.window));
 
-        s_km        <= std_logic_vector(to_unsigned(0, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(M) + unsigned(K));
-        s_km_b      <= std_logic_vector(to_unsigned(0, C) + to_unsigned(K_sel, ceil2power(K_sel))*(unsigned(M) + 1) + (unsigned(M) + 1)); 
+        s_km        <= std_logic_vector(to_unsigned(0, C) + to_unsigned(K_sel, ceil2power(K_sel))*unsigned(counters.segment) + unsigned(counters.window));
+        s_km_b      <= std_logic_vector(to_unsigned(0, C) + to_unsigned(K_sel, ceil2power(K_sel))*(unsigned(counters.segment) + 1) + (unsigned(counters.segment) + 1)); 
 
 
-        process(bl, M, U)
+        process(bl, counters.segment, counters.element, top_m, top_u)
         begin
-                bl <= std_logic_vector(top_m - unsigned(M)) & std_logic_vector(unsigned(top_u) - unsigned(U));
+                bl <= std_logic_vector(top_m - unsigned(counters.segment)) & std_logic_vector(unsigned(top_u) - unsigned(counters.element));
         end process;
 
-        process(select_addr_B, bl, s_km_b, s_k, g_km, s_km)
+        process(select_addr_B, bl, s_km_b, s_k, g_km, s_km, array_xn_k)
         begin
                 case select_addr_B is
-                        when "000"  => address_out_B <= bl;
-                        when "001"  => address_out_B <= s_k;
-                        when "010"  => address_out_B <= s_km;
-                        when "011"  => address_out_B <= s_km_b;
+                        when "000"  => address_out_B <= array_xn_k(to_integer(unsigned(counters.window)));
+                        when "001"  => address_out_B <= bl;   
+                        when "010"  => address_out_B <= s_k;  
+                        when "011"  => address_out_B <= s_km; 
+                        when "100"  => address_out_B <= s_km_b;
                         when others => address_out_B <= g_km;
                 end case;
         end process;
@@ -82,10 +82,10 @@ begin
         -- Para el loop 1, vas a entrar con el x_n red y con la direccion calculada.
 
 
-        process(select_addr_A, g_k, s_k, g_km, s_km, K)
+        process(select_addr_A, g_k, s_k, g_km, s_km, counters.window, array_xn_k, fifo_xn)
         begin
                 case select_addr_A is
-                        when "000"   => address_out_A <= array_xn_k(to_integer(unsigned(K)));
+                        when "000"   => address_out_A <= array_xn_k(to_integer(unsigned(counters.window)));
                         when "001"   => address_out_A <= fifo_xn;
                         when "010"   => address_out_A <= g_k;
                         when "011"   => address_out_A <= g_km;

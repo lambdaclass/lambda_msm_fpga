@@ -36,7 +36,7 @@ begin
                 end if;
         end process;
 
-        process(state_reg,  start_loop1, start_loop2, start_loop3)
+        process(state_reg,  start_loop1, start_loop2, start_loop3, done)
         begin
                 state_next <= state_reg;
 

@@ -2,6 +2,8 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
+use work.tipos.ALL;
+
 entity FSM_aggregator is
         port ( 
                 clk, rst                : in std_logic;
@@ -27,7 +29,7 @@ entity FSM_aggregator is
 
                 -- Tiene los 4 bits de control. Los 3 menos signif corresponden a las escrituras en cada componente de memoria. 
                 -- El mas significativo es un data valid.
-                padd_status_out         : out std_logic_vector(3 downto 0);
+                padd_status_out         : out padd_status;
 
                 bucket_address_sel      : out std_logic;
                 mem_address_sel         : out std_logic;
@@ -121,7 +123,7 @@ begin
 
                 addr_A_read_out <= (others => '0');
                 addr_B_read_out <= (others => '0');
-                padd_status_out <= (others => '0');
+                padd_status_out <= ('0','0','0','0');
 
                 bucket_address_sel <= '0';
                 mem_address_sel    <= '0';
@@ -142,7 +144,8 @@ begin
 
                                 k_next <= '1';
                                 -- Escribo en aux
-                                padd_status_out <= "1001";
+                                padd_status_out <= ('1','0','0','1');
+
 
                                 aux_address_sel <= '0';
                                 mem_address_sel <= '1';
@@ -156,7 +159,7 @@ begin
 
                                 k_next <= '1';
                                 -- Escribo en aux y segmento
-                                padd_status_out <= "1011";
+                                padd_status_out <= ('1','0','1','1');
 
                                 mem_address_sel <= '0';
                                 bucket_address_sel <= '1';
@@ -175,7 +178,7 @@ begin
 
                                 k_next <= '1';
                                 -- Escribo en bucket y segmento
-                                padd_status_out <= "1110";
+                                padd_status_out <= ('1','1','1','0');
 
                                 mem_address_sel <= '0';
                                 aux_address_sel <= '1';
@@ -188,8 +191,8 @@ begin
                                 data_B_select <= "100";
 
                                 k_next <= '1';
-                                -- Escribo en bucket 
-                                padd_status_out <= "1101";
+                                -- Escribo en bucket (Y aux??)
+                                padd_status_out <= ('1','1','0','1');
 
                                 aux_address_sel <= '0';
                                 bucket_address_sel <= '1';
@@ -205,7 +208,7 @@ begin
 
                                 k_next <= '1';
                                 -- Escribo en aux y segmento
-                                padd_status_out <= "1011";
+                                padd_status_out <= ('1','0','1','0');
 
                                 aux_address_sel <= '0';
                                 mem_address_sel <= '1';
@@ -219,7 +222,7 @@ begin
 
                                 k_next <= '1';
                                 -- Escribo en bucket y segmento
-                                padd_status_out <= "1110";
+                                padd_status_out <= ('1','1','1','0');
                                 if window_done = '1' then
                                         log_next <=  '1';
                                 else
@@ -239,7 +242,7 @@ begin
 
                                 k_next <= '1';
                                 -- Escribo en bucket
-                                padd_status_out <= "1100";
+                                padd_status_out <= ('1','1','0','0');
 
                                 bucket_address_sel <= '0';
                                 aux_address_sel <= '1';

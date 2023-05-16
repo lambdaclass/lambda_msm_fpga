@@ -4,35 +4,33 @@ use ieee.numeric_std.all;
 use ieee.math_real.all;
 use work.funciones.all;
 use work.config.all;
+use work.tipos.all;
 
 entity bucket_mem is
   generic(
-    K      : integer := 3;      -- 29 Frames
-    DWIDTH : integer := 72*5;  -- 72*16N * 3;   -- Data Width
-    AWIDTH : integer := 12*3     --253 Address Width
+    K      : integer := 22;      -- 29 Frames
+    DWIDTH : integer := 72*16;  -- 72*16N * 3;   -- Data Width
+    AWIDTH : integer := 12     --253 Address Width
   );
   port(
     clk         : in std_logic;                                  -- Clock
-    rst         : in std_logic;                                  -- Reset
-    -- Port A
-    wea         : in std_logic;                                  -- Write Enable - Port A
-    dina        : in std_logic_vector(DWIDTH-1 downto 0);       -- Data Input - Port A
-    addra       : in std_logic_vector(AWIDTH-1 downto 0);      -- Address Input - Port A
-    douta       : out std_logic_vector(DWIDTH-1 downto 0);      -- Data Output - Port A
+--    rst         : in std_logic;                                  -- Reset
+
+    port_a      : in memory_in_t;
+    port_b      : in memory_in_t;
+
     kwa         : in std_logic_vector(ceil2power(K)-1 downto 0);-- K select for write - Port A
     kra         : in std_logic_vector(ceil2power(K)-1 downto 0);-- K select for read - Port A
-    -- Port B
-    web         : in std_logic;                                  -- Write Enable - Port B
-    dinb        : in std_logic_vector(DWIDTH-1 downto 0);       -- Data Input - Port B
-    addrb       : in std_logic_vector(AWIDTH-1 downto 0);      -- Address Input - Port B
-    doutb       : out std_logic_vector(DWIDTH-1 downto 0);     -- Data Output - Port B
     kwb         : in std_logic_vector(ceil2power(K)-1 downto 0); -- K select for write - Port B
     krb         : in std_logic_vector(ceil2power(K)-1 downto 0); -- K select for read - Port A
+
     -- Flags
     busya_o     : out std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port A
     busyb_o     : out std_logic_vector(K-1 downto 0);   -- Busy bit output for addressed K buckets - Port B
     emptya_o    : out std_logic_vector(K-1 downto 0);   -- Empty bit output for addressed K buckets - Port A
-    emptyb_o    : out std_logic_vector(K-1 downto 0)    -- Empty bit output for addressed K buckets - Port B
+    emptyb_o    : out std_logic_vector(K-1 downto 0);    -- Empty bit output for addressed K buckets - Port B
+
+    mem_out     : out dp_memory_out_t
   );
 end bucket_mem;
 
@@ -63,11 +61,11 @@ U0_URAMS: for i in 0 to K-1 generate
       web     => web_k(i),  -- Write Enable - Port B
       mem_ena  => '1',      -- Memory Enable - Port A
       mem_enb  => '1',      -- Memory Enable - Port B
-      dina    => dina,      -- Data Input - Port A
-      addra   => addra,   
+      dina    => port_a.din,      -- Data Input - Port A
+      addra   => port_a.addr,   
       douta   => douta_k(i),-- Data Output - Port A
-      dinb    => dinb,      -- Data Input - Port B
-      addrb   => addrb,     -- Address Input - Port B
+      dinb    => port_b.din,      -- Data Input - Port B
+      addrb   => port_b.addr,     -- Address Input - Port B
       doutb   => doutb_k(i) -- Data Output - Port B
     );
 
@@ -79,26 +77,26 @@ U0_URAMS: for i in 0 to K-1 generate
 
     end generate;
 
-  U1A_WEA_DECODER: process(kwa, wea)
+  U1A_WEA_DECODER: process(kwa, port_a)
     begin
       wea_k <= (others => '0');   -- default
-      wea_k(to_integer(unsigned(kwa))) <= wea;
+      wea_k(to_integer(unsigned(kwa))) <= port_a.we;
     end process;
 
-  U1B_WEB_DECODER: process(kwb, web)
+  U1B_WEB_DECODER: process(kwb, port_b)
     begin
       web_k <= (others => '0');   -- default
-      web_k(to_integer(unsigned(kwb))) <= web;
+      web_k(to_integer(unsigned(kwb))) <= port_b.we;
     end process;
 
   U2A_DOUT_MUX: process(kra_d, douta_k)
   begin
-    douta <= douta_k(to_integer(unsigned(kra_d)));
+    mem_out.douta <= douta_k(to_integer(unsigned(kra_d)));
   end process;
 
   U2B_DOUT_MUX: process(krb_d, doutb_k)
   begin
-    doutb <= doutb_k(to_integer(unsigned(krb_d)));
+    mem_out.doutb <= doutb_k(to_integer(unsigned(krb_d)));
   end process;
 
   U3_DELAYS_PROC: process(clk)

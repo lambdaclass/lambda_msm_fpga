@@ -30,8 +30,8 @@ end uram_dp_wf;
 
 architecture rtl of uram_dp_wf is
 
-  --shared variable mem : mem_t(2**C_AWIDTH-1 downto 0) := fill_mem(4096);
-  shared variable mem : mem_t(2**C_AWIDTH-1 downto 0);
+  shared variable mem : mem_t(2**C_AWIDTH-1 downto 0) := fill_mem(4096);
+  --shared variable mem : mem_t(2**C_AWIDTH-1 downto 0);
   
   attribute ram_style : string;
   attribute ram_style of mem : variable is "ultra";

@@ -2,7 +2,8 @@ library IEEE;
 --library UTILS;
 use IEEE.STD_LOGIC_1164.all;
 use IEEE.NUMERIC_STD.all;
-use work.TIPOS.all;
+
+use work.tipos.all;
 use work.config.all;
 
 --* @brief Librería de funciones básicas
