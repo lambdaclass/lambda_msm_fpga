@@ -94,10 +94,10 @@ package tipos is
         fb_allWithElem  : std_logic;
   end record fifo_bank_status;
 
-  type fifo_bank_kstatus is record
-        fb_kempty       : std_logic_vector(K - 1 downto 0);
-        fb_kfull        : std_logic_vector(K - 1 downto 0);
-  end record fifo_bank_kstatus;
+--  type fifo_bank_kstatus is record
+--        fb_kempty       : std_logic_vector(K - 1 downto 0);
+--        fb_kfull        : std_logic_vector(K - 1 downto 0);
+--  end record fifo_bank_kstatus;
 
   type padd_status is record
         data_valid      : std_logic;
@@ -105,6 +105,15 @@ package tipos is
         mem_we          : std_logic;
         aux_we          : std_logic;
   end record padd_status;
+
+  type padd_delay is record
+        data_valid      : std_logic;
+        bucket_we       : std_logic;
+        mem_we          : std_logic;
+        aux_we          : std_logic;
+        window          : std_logic_vector(5 - 1 downto 0);
+        address         : std_logic_vector(C - 1 downto 0);
+  end record padd_delay;
 
   type counters_status is record
           status_w_done     : std_logic;
@@ -125,4 +134,13 @@ package tipos is
           input_count : std_logic;
           padd_count  : std_logic;
   end record count_signals;
+
+  type padd_op_A is (bucket_op, segment_op, aux_op);
+
+  type padd_op_B is (bucket_op, fifo_op, segment_op, aux_op, input_op);
+
+  type address_A is (xn, fifo, g_k, g_km, s_k, s_km);
+
+  type address_B is (xn, bucket, s_k, s_km, s_km_b, g_km);
+
 end package;

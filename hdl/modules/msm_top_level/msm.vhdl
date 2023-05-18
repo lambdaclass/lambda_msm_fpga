@@ -45,12 +45,10 @@ entity msm is
         output_flag_rst_busy     : out std_logic; 
         output_flag_almost_empty : out std_logic;
 
-        input_flag_empty        : out std_logic;  
-        input_flag_full         : out std_logic; 
-        input_flag_rst_busy     : out std_logic; 
-        input_flag_almost_empty : out std_logic 
-
-
+        input_flag_empty         : out std_logic;  
+        input_flag_full          : out std_logic; 
+        input_flag_rst_busy      : out std_logic; 
+        input_flag_almost_empty  : out std_logic 
     );
 end msm;
 
@@ -62,10 +60,9 @@ architecture Behavioral of msm is
         signal bucket_port_b            : memory_in_t;
         signal bucket_port_out          : dp_memory_out_t;
 
-        signal bucket_kwa               : std_logic_vector(ceil2power(K)-1 downto 0);
-        signal bucket_kra               : std_logic_vector(ceil2power(K)-1 downto 0) := zeros(ceil2power(K));
-        signal bucket_kwb               : std_logic_vector(ceil2power(K)-1 downto 0);
-        signal bucket_krb               : std_logic_vector(ceil2power(K)-1 downto 0);
+        signal bucket_ka               : std_logic_vector(ceil2power(K)-1 downto 0);
+        signal bucket_kb               : std_logic_vector(ceil2power(K)-1 downto 0);
+
         signal bucket_kbusy_o           : std_logic_vector(K-1 downto 0);
         signal bucket_kempty_o          : std_logic_vector(K-1 downto 0);
         signal bucket_kstatus_t         : bucket_kstatus;
@@ -93,21 +90,14 @@ architecture Behavioral of msm is
         signal pa_op2                   : point_t(2 downto 0);
         signal pa_r                     : point_t(2 downto 0);
 
-        signal pa_op1_sel               : std_logic_vector(1 downto 0);
-        signal pa_op2_sel               : std_logic_vector(2 downto 0);
-
-        -----------------------------------------------------------------------------------
-        -----------------------------------------------------------------------------------
-
-        signal aux_sel                  : std_logic;
-        signal bucket_sel               : std_logic;
-        signal mem_sel                  : std_logic;
+        signal pa_op1_sel               : padd_op_A;
+        signal pa_op2_sel               : padd_op_B;
 
         -----------------------------------------------------------------------------------
         -----------------------------------------------------------------------------------
                               
-        signal sel_address_A            : std_logic_vector(2 downto 0);
-        signal sel_address_B            : std_logic_vector(2 downto 0);
+        signal sel_address_A            : address_A;
+        signal sel_address_B            : address_B;
                                          
         signal address_A_out            : std_logic_vector(C - 1 downto 0);
         signal address_B_out            : std_logic_vector(C - 1 downto 0);
@@ -115,7 +105,7 @@ architecture Behavioral of msm is
         ----------------------------------------------------------------------------------
         ----------------------------------------------------------------------------------
 
-        signal counter_signals          : count_signals ;
+        signal counter_signals          : count_signals;
         signal counter_values           : counters;
         signal counter_status           : counters_status;
 
@@ -128,15 +118,18 @@ architecture Behavioral of msm is
 
         signal fifo_bank_din            : std_logic_vector(DWIDTH_FIFO_B-1 downto 0);
         signal fifo_bank_dout           : std_logic_vector(DWIDTH_FIFO_B-1 downto 0);
-        signal fifo_bank_kw             : std_logic_vector(ceil2power(K)-1 downto 0);
-        signal fifo_bank_kr             : std_logic_vector(ceil2power(K)-1 downto 0);
+        signal fifo_bank_k              : std_logic_vector(ceil2power(K)-1 downto 0);
         signal fifo_bank_we             : std_logic;
         signal fifo_bank_re             : std_logic;
-        signal fifo_bank_kstatus_t      : fifo_bank_kstatus;
-        
+        signal fifo_select              : std_logic;
 
-        signal padd_propagation_in      : std_logic_vector(ceil2power(K) + C + 3 downto 0);
-        signal padd_propagation_out     : std_logic_vector(ceil2power(K) + C + 3 downto 0);
+        signal fifo_bank_empty : std_logic;
+        signal fifo_bank_full  : std_logic;
+        signal fifo_bank_kempty_s : std_logic_vector(K - 1 downto 0);
+
+        signal padd_delay_in            : padd_delay;
+        signal padd_delay_out           : padd_delay;
+        signal propagation_out          : std_logic_vector(ceil2power(K) + C + 3 downto 0);
 
         signal fifo_input_in            : fifo_in_t;
         signal fifo_input_out           : fifo_out_t;
@@ -178,28 +171,26 @@ begin
         process(pa_op1_sel, bucket_port_out, memory_port_out, aux_port_out)
         begin
                 case pa_op1_sel is
-                        when "00" =>    pa_op1 <= to_point_t_threeCoords(bucket_port_out.doutb);
-                        when "01" =>    pa_op1 <= to_point_t_threeCoords(memory_port_out.doutb);
-                        when others =>  pa_op1 <= to_point_t_threeCoords(aux_port_out.doutb);
+                        when bucket_op          =>  pa_op1 <= to_point_t_threeCoords(bucket_port_out.doutb);
+                        when segment_op         =>  pa_op1 <= to_point_t_threeCoords(memory_port_out.doutb);
+                        when others             =>  pa_op1 <= to_point_t_threeCoords(aux_port_out.doutb);
                 end case;
         end process;
 
         process(pa_op2_sel, bucket_port_out, memory_port_out, aux_port_out, fifo_bank_dout, temp_input)
         begin
                 case pa_op2_sel is
-                        when "000" =>    pa_op2 <= to_point_t_threeCoords(bucket_port_out.doutb);
-                        when "001" =>    pa_op2 <= to_point_t_threeCoords(fifo_bank_dout(3*N_vect - 1 downto 0));
-                        when "010" =>    pa_op2 <= to_point_t_threeCoords(memory_port_out.doutb);
-                        when "011" =>    pa_op2 <= to_point_t_threeCoords(aux_port_out.doutb);
-                        when others =>   pa_op2 <= to_point_t_threeCoords(temp_input);
+                        when bucket_op          =>  pa_op2 <= to_point_t_threeCoords(bucket_port_out.doutb);
+                        when fifo_op            =>  pa_op2 <= to_point_t_threeCoords(fifo_bank_dout(3*N_vect - 1 downto 0));
+                        when segment_op         =>  pa_op2 <= to_point_t_threeCoords(memory_port_out.doutb);
+                        when aux_op             =>  pa_op2 <= to_point_t_threeCoords(aux_port_out.doutb);
+                        when others             =>  pa_op2 <= to_point_t_threeCoords(temp_input);
                 end case;
         end process;
 
-        
-        -- AGREGAR FALTANTES DE LOOP 1 (?)
-        bucket_port_a   <= (padd_propagation_out(PACKAGE_SIZE - 1) and padd_propagation_out(PACKAGE_SIZE - 2) , padd_propagation_out(C - 1 downto 0), (zeros(DWIDTH_BUCKET - 3*N_vect) & pa_r(2) & pa_r(1) & pa_r(0)));
-        memory_port_a   <= (padd_propagation_out(PACKAGE_SIZE - 1) and padd_propagation_out(PACKAGE_SIZE - 3) , padd_propagation_out(C - 1 downto 0), (zeros(DWIDTH_BUCKET - 3*N_vect) & pa_r(2) & pa_r(1) & pa_r(0)));
-        aux_port_a      <= (padd_propagation_out(PACKAGE_SIZE - 1) and padd_propagation_out(PACKAGE_SIZE - 4) , padd_propagation_out(C - 1 downto 0), (zeros(DWIDTH_BUCKET - 3*N_vect) & pa_r(2) & pa_r(1) & pa_r(0)));
+        bucket_port_a  <= (padd_delay_out.data_valid and padd_delay_out.bucket_we , padd_delay_out.address, (zeros(DWIDTH_BUCKET - 3*N_vect) & pa_r(2) & pa_r(1) & pa_r(0)));
+        memory_port_a  <= (padd_delay_out.data_valid and padd_delay_out.mem_we    , padd_delay_out.address, (zeros(DWIDTH_BUCKET - 3*N_vect) & pa_r(2) & pa_r(1) & pa_r(0)));
+        aux_port_a     <= (padd_delay_out.data_valid and padd_delay_out.aux_we    , padd_delay_out.address, (zeros(DWIDTH_BUCKET - 3*N_vect) & pa_r(2) & pa_r(1) & pa_r(0)));
 
         -----------------------------------------------------------------------------------
         -----------------------------------------------------------------------------------
@@ -214,16 +205,14 @@ begin
                 clk         => clk,
                 -- rst         => rst,
                 -- Port A
-                port_a => bucket_port_a,
+                port_a      => bucket_port_a,
 
                 -- Port B
-                port_b => bucket_port_b,
+                port_b      => bucket_port_b,
 
                 -- Window selection
-                kwa         => bucket_kwa,
-                kra         => bucket_kra,
-                kwb         => bucket_kwb,
-                krb         => bucket_krb,
+                ka          => bucket_ka,
+                kb          => bucket_kb,
 
                 -- Flags
                 busya_o     => open,   
@@ -235,10 +224,8 @@ begin
                 mem_out => bucket_port_out
         );                
 
-
-        bucket_kwb <= counter_values.window;
-        bucket_krb <= counter_values.window;
-        bucket_kwa <= padd_propagation_out(16 downto 12);
+        bucket_kb <= counter_values.window;
+        bucket_ka <= padd_delay_out.window;
 
         U_SEGMENT_MEMORY: entity work.uram_dp_wf
         generic map(
@@ -287,22 +274,29 @@ begin
                 rst    => rst,
                 
                 -- Control signals
-                kw       => fifo_bank_kw,
+                kv       => fifo_bank_k,
                 we       => fifo_bank_we,
-                kr       => fifo_bank_kr,
                 re       => fifo_bank_re,
 
-                empty_o  => fifo_bank_kstatus_t.fb_kempty,
-                full_o   => fifo_bank_kstatus_t.fb_kfull,
+                empty_dispatch_o => fifo_bank_kempty_s, 
+                bank_empty       => fifo_bank_empty,
+                bank_full        => fifo_bank_full,
         
                  -- Data signals
-                -- Aca tiene que ir una senial de un mux, porque puedo escribir tanto de la entrada como retroalimentar el valor que saque del banco.
-                din      => address_A_out & temp_input,
+                din      => fifo_bank_din,
                 dout     => fifo_bank_dout
+
         );                                         
 
-        fifo_bank_kw <= counter_values.window;
-        fifo_bank_kr <= counter_values.window;
+        process(fifo_select, address_A_out, temp_input, fifo_bank_dout)
+        begin
+                case fifo_select is
+                        when '0'        => fifo_bank_din <= address_A_out & temp_input;
+                        when others     => fifo_bank_din <= fifo_bank_dout;
+                end case;
+        end process;
+
+        fifo_bank_k     <= counter_values.window;
 
         U_INPUT: entity work.generic_fifo
         generic map(NUMBER_FIFOS => 3)
@@ -349,7 +343,6 @@ begin
 
         -----------------------------------------------------------------------------------
         -----------------------------------------------------------------------------------
-        padd_propagation_in <= padd_status_o.data_valid & padd_status_o.bucket_we & padd_status_o.mem_we & padd_status_o.aux_we & counter_values.window & address_A_out;
 
         U_PROPAGATION: entity work.delay_M
         generic map(
@@ -360,9 +353,12 @@ begin
                 clk => clk,
                 rst => rst,
 
-                s => padd_propagation_in,
-                s_delayed => padd_propagation_out 
+                s => to_vector_padd_d(padd_delay_in),
+                s_delayed => propagation_out
         );
+
+        padd_delay_in <= (padd_status_o.data_valid, padd_status_o.bucket_we, padd_status_o.mem_we, padd_status_o.aux_we, counter_values.window, address_A_out);
+        padd_delay_out <= to_padd_d(propagation_out);
 
         U_ADDRESS_SEL: entity work.addr_selection
         generic map(
@@ -384,40 +380,14 @@ begin
                 address_out_B => address_B_out
         ); 
 
-        -- Nota: Como el puerto B de dichas memorias solamente va a ser RO, entonces no es necesario 
+        aux_port_b.we   <= '0';
+        aux_port_b.din  <= (others => '0');
 
-        process(aux_sel, address_A_out, address_B_out)
-        begin
-                case aux_sel is
-                        when '1' =>     aux_port_b.addr <= address_A_out;
-                        when others =>  aux_port_b.addr <= address_B_out;
-                end case;
-        end process;
+        bucket_port_b.we        <= bucket_web_port_b; 
+        bucket_port_b.din       <= bucket_status_port_b.busy_o & bucket_status_port_b.empty_o & zeros(DWIDTH_BUCKET - 2 - 3*N_vect) & temp_input;
 
-        aux_port_b.we <= '0';
-        aux_port_b.din <= (others => '0');
-
-        process(bucket_sel, address_A_out, address_B_out)
-        begin
-                case bucket_sel is
-                        when '1' =>     bucket_port_b.addr <= address_A_out;
-                        when others =>  bucket_port_b.addr <= address_B_out;
-                end case;
-        end process;
-
-        bucket_port_b.we <= bucket_web_port_b; 
-        bucket_port_b.din <= bucket_status_port_b.busy_o & bucket_status_port_b.empty_o & zeros(DWIDTH_BUCKET - 2 - 3*N_vect) & temp_input;
-
-        process(mem_sel, address_A_out, address_B_out)
-        begin
-                case mem_sel is
-                        when '1' =>     memory_port_b.addr<= address_A_out;
-                        when others =>  memory_port_b.addr<= address_B_out;
-                end case;
-        end process;
-        
-        memory_port_b.we <= '0';
-        memory_port_b.din <= (others => '0');
+        memory_port_b.we        <= '0';
+        memory_port_b.din       <= (others => '0');
 
         CONTROLLER_MGMT : entity work.controller
         generic map (K => K,
@@ -430,33 +400,31 @@ begin
                 rst                     => rst, 
 
                 start_MSM               => not fifo_input_out.empty_o,
-                data_valid_in           => padd_propagation_out(PACKAGE_SIZE - 1),
+                data_valid_in           => padd_delay_out.data_valid,
                 bucket_kstatus          => bucket_kstatus_t, 
-                fifo_bank_kstatus       => fifo_bank_kstatus_t, 
 
-                op_selector_A   => pa_op1_sel, 
-                op_selector_B   => pa_op2_sel, 
+                fifo_bank_kempty        => fifo_bank_kempty_s, 
+                fifo_empty_s            => fifo_bank_empty,
+                fifo_full_s             => fifo_bank_full,
 
-                addr_selector_A => sel_address_A, 
-                addr_selector_B => sel_address_B, 
+                op_selector_A           => pa_op1_sel, 
+                op_selector_B           => pa_op2_sel, 
 
-                fifo_bank_we => fifo_bank_we,
-                fifo_bank_re => fifo_bank_re,
+                addr_selector_A         => sel_address_A, 
+                addr_selector_B         => sel_address_B, 
 
-                bucket_status_o => bucket_status_port_b,
-                bucket_web_o    => bucket_web_port_b,
-                
-                bucket_address_sel => bucket_sel,                
-                mem_address_sel =>    mem_sel,
-                aux_address_sel =>    aux_sel,
+                fifo_bank_we            => fifo_bank_we,
+                fifo_bank_re            => fifo_bank_re,
+                fifo_select             => fifo_select,
 
-                counters_addr   => counter_values, 
-                padd_status_out => padd_status_o,
+                bucket_status_o         => bucket_status_port_b,
+                bucket_web_o            => bucket_web_port_b,
 
-                input_next => fifo_input_in.re, 
-                output_we => fifo_out_in.we
+                counters_addr           => counter_values, 
+                padd_status_out         => padd_status_o,
+
+                input_next              => fifo_input_in.re, 
+                output_we               => fifo_out_in.we
              );
-
-
 
 end Behavioral;

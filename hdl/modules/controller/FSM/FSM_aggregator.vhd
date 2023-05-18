@@ -14,13 +14,13 @@ entity FSM_aggregator is
                 segment_done            : in std_logic;
                 elements_done           : in std_logic;
                 log_done                : in std_logic;
-                padd_datavalid          : in std_logic;
+                padd_done               : in std_logic;
 
-                addr_A_read_out         : out std_logic_vector(2 downto 0);
-                addr_B_read_out         : out std_logic_vector(2 downto 0);
+                addr_A_read_out         : out address_A;
+                addr_B_read_out         : out address_B;
 
-                data_A_select           : out std_logic_vector(1 downto 0);
-                data_B_select           : out std_logic_vector(2 downto 0);
+                data_A_select           : out padd_op_A; 
+                data_B_select           : out padd_op_B; 
 
                 k_next                  : out std_logic;
                 u_next                  : out std_logic;
@@ -30,19 +30,11 @@ entity FSM_aggregator is
                 -- Tiene los 4 bits de control. Los 3 menos signif corresponden a las escrituras en cada componente de memoria. 
                 -- El mas significativo es un data valid.
                 padd_status_out         : out padd_status;
-
-                bucket_address_sel      : out std_logic;
-                mem_address_sel         : out std_logic;
-                aux_address_sel         : out std_logic;
-
                 aggregation_done        : out std_logic
 );
 end FSM_aggregator;
 
 architecture Structural of FSM_aggregator is
-
-        type pa_op1_input is (G_K, G_KM, S_K, S_KM,S_SKM);
-        type pa_op2_input is (BUCKET, S_K, S_KM, S_KM_MINUS, G_KM);
 
         type states_loop is (idle, read_gs_km, read_seg_bucket, change_segment, change_element, change_to_acc, read_skskm, read_gkgkm, change_segment_b, read_skmb, read_sklog, read_wait, read_gs, wait_for_padd, endState);
         signal state_next, state_reg : states_loop;
@@ -58,7 +50,7 @@ begin
                 end if;
         end process;
         
-        process(state_reg, window_done, segment_done, elements_done, aggregation_start, log_done, padd_datavalid)
+        process(state_reg, window_done, segment_done, elements_done, aggregation_start, log_done, padd_done)
         begin
                 state_next <= state_reg;
 
@@ -82,7 +74,7 @@ begin
                                 state_next <= read_skskm;
                         when read_skskm => 
                                 state_next <= read_gkgkm when window_done = '1' else
-                                              -- Me falta un OR en esta parte
+                                              -- Me falta un OR en esta parte (?)
                                               read_skskm;
                         when read_gkgkm =>
                                 state_next <= change_segment_b when window_done = '1' else
@@ -98,13 +90,13 @@ begin
                                               read_gs when log_done = '1' else
                                               read_sklog;
                         when read_wait =>
-                                state_next <= read_sklog when padd_datavalid = '0' else
+                                state_next <= read_sklog when padd_done = '1' else
                                               read_wait;
                         when read_gs    => 
                                 state_next <= wait_for_padd when window_done = '1' else
                                               read_gs;
                         when wait_for_padd =>
-                                state_next <= endState when padd_datavalid = '0' else
+                                state_next <= endState when padd_done = '1' else
                                               wait_for_padd;
                         when endState   =>
                                 state_next <= state_reg;
@@ -121,48 +113,38 @@ begin
                 k_next          <= '0';
                 log_next        <= '0';
 
-                addr_A_read_out <= (others => '0');
-                addr_B_read_out <= (others => '0');
+                -- Tiro valores random para inicializar esto.;
+                addr_A_read_out <= g_k;
+                addr_B_read_out <= bucket;
                 padd_status_out <= ('0','0','0','0');
 
-                bucket_address_sel <= '0';
-                mem_address_sel    <= '0';
-                aux_address_sel    <= '0';
-
-                data_A_select     <= "00"; 
-                data_B_select     <= "000"; 
+                data_A_select     <= bucket_op; 
+                data_B_select     <= bucket_op;
                 aggregation_done   <= '0';
 
                 case state_reg is
                         when idle =>
                         when read_gs_km =>
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(G_KM), addr_A_read_out'length));
-                                addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_KM), addr_B_read_out'length));
+                                addr_A_read_out <= g_km;
+                                addr_B_read_out <= s_km;
 
-                                data_A_select <= "10";
-                                data_B_select <= "010";
+                                data_A_select <= aux_op;
+                                data_B_select <= segment_op;
 
                                 k_next <= '1';
                                 -- Escribo en aux
                                 padd_status_out <= ('1','0','0','1');
 
-
-                                aux_address_sel <= '0';
-                                mem_address_sel <= '1';
-
                         when read_seg_bucket =>
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(S_KM), addr_A_read_out'length));
-                                addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(BUCKET), addr_B_read_out'length));
+                                addr_A_read_out <= s_km;
+                                addr_B_read_out <= bucket;
 
-                                data_A_select <= "01";
-                                data_B_select <= "000";
+                                data_A_select <= segment_op;
+                                data_B_select <= bucket_op;
 
                                 k_next <= '1';
                                 -- Escribo en aux y segmento
                                 padd_status_out <= ('1','0','1','1');
-
-                                mem_address_sel <= '0';
-                                bucket_address_sel <= '1';
 
                         when change_segment =>
                                 m_next <= '1';
@@ -170,55 +152,46 @@ begin
                                 u_next <= '1';
                         when change_to_acc =>
                         when read_skskm =>
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(S_K), addr_A_read_out'length));
-                                addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_KM), addr_B_read_out'length));
+                                addr_A_read_out <= s_k;
+                                addr_B_read_out <= s_km;
 
-                                data_A_select <= "01";
-                                data_B_select <= "100";
+                                data_A_select <= segment_op;
+                                data_B_select <= aux_op;
 
                                 k_next <= '1';
                                 -- Escribo en bucket y segmento
                                 padd_status_out <= ('1','1','1','0');
 
-                                mem_address_sel <= '0';
-                                aux_address_sel <= '1';
-
                         when read_gkgkm => 
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(G_K), addr_A_read_out'length));
-                                addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(G_KM), addr_B_read_out'length));
+                                addr_A_read_out <= g_k;
+                                addr_B_read_out <= g_km;
 
-                                data_A_select <= "00";
-                                data_B_select <= "100";
+                                data_A_select <= bucket_op;
+                                data_B_select <= aux_op;
 
                                 k_next <= '1';
                                 -- Escribo en bucket (Y aux??)
                                 padd_status_out <= ('1','1','0','1');
 
-                                aux_address_sel <= '0';
-                                bucket_address_sel <= '1';
-
                         when change_segment_b =>
                                 m_next <= '1';
                         when read_skmb =>
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(S_KM), addr_A_read_out'length));
-                                addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_KM_MINUS), addr_B_read_out'length));
+                                addr_A_read_out <= s_km;
+                                addr_B_read_out <= s_km_b;
 
-                                data_A_select <= "01";
-                                data_B_select <= "100";
+                                data_A_select <= segment_op;
+                                data_B_select <= aux_op;
 
                                 k_next <= '1';
                                 -- Escribo en aux y segmento
                                 padd_status_out <= ('1','0','1','0');
 
-                                aux_address_sel <= '0';
-                                mem_address_sel <= '1';
-
                         when read_sklog =>
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(S_K), addr_A_read_out'length));
-                                addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_K), addr_B_read_out'length));
+                                addr_A_read_out <= s_k;
+                                addr_B_read_out <= s_k;
 
-                                data_A_select <= "01";
-                                data_B_select <= "000";
+                                data_A_select <= segment_op;
+                                data_B_select <= segment_op;
 
                                 k_next <= '1';
                                 -- Escribo en bucket y segmento
@@ -229,23 +202,17 @@ begin
                                         log_next <=  '0';
                                 end if;
 
-                                mem_address_sel <= '0';
-                                bucket_address_sel <= '1';
-
                         when read_wait =>
                         when read_gs =>
-                                addr_A_read_out <= std_logic_vector(to_unsigned(pa_op1_input'POS(G_K), addr_A_read_out'length));
-                                addr_B_read_out <= std_logic_vector(to_unsigned(pa_op2_input'POS(S_K), addr_B_read_out'length));
+                                addr_A_read_out <= g_k;
+                                addr_B_read_out <= s_k;
 
-                                data_A_select <= "00";
-                                data_B_select <= "001";
+                                data_A_select <= bucket_op;
+                                data_B_select <= segment_op;
 
                                 k_next <= '1';
                                 -- Escribo en bucket
                                 padd_status_out <= ('1','1','0','0');
-
-                                bucket_address_sel <= '0';
-                                aux_address_sel <= '1';
 
                         when wait_for_padd =>
                         when endState =>

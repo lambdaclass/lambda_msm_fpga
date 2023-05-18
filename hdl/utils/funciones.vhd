@@ -52,6 +52,12 @@ package funciones is
    --* Construye una memoria de tipo mem_t y la rellena con valores hasta cierto rango.
   function fill_mem(N : natural) 
    return mem_t;
+   --* Convierte un padd_delay a un std_logic_vector
+  function to_vector_padd_d(p : padd_delay) 
+   return std_logic_vector;
+   --* Convierte un std_logic_vector a un padd_delay;
+  function to_padd_d(vector : std_logic_vector) 
+   return padd_delay;
 
 end package;
 
@@ -662,5 +668,40 @@ end to_point_t_threeCoords;
 end fill_mem;
 
 ------------------------------------------------------------------------
+
+function to_vector_padd_d(p : padd_delay) return std_logic_vector is
+
+      variable vector : std_logic_vector(12 + ceil2power(K) + 3 downto 0);
+
+begin
+
+      vector(C - 1 downto 0) := p.address;
+      vector(ceil2power(K) + C - 1 downto C) := p.window;
+      vector(ceil2power(K) + C) := p.aux_we;
+      vector(ceil2power(K) + C + 1) := p.mem_we;
+      vector(ceil2power(K) + C + 2) := p.bucket_we;
+      vector(ceil2power(K) + C + 3) := p.data_valid;
+      
+      return vector;
+end to_vector_padd_d;
+
+------------------------------------------------------------------------
+
+function to_padd_d(vector : std_logic_vector) return padd_delay is
+
+      variable padd_d : padd_delay;
+
+begin 
+
+      padd_d.address          := vector(C - 1 downto 0);
+      padd_d.window           := vector(C + ceil2power(K) - 1 downto C);
+      padd_d.aux_we           := vector(C + ceil2power(K));
+      padd_d.mem_we           := vector(C + ceil2power(K) + 1);
+      padd_d.bucket_we        := vector(C + ceil2power(K) + 2);
+      padd_d.data_valid       := vector(C + ceil2power(K) + 3);
+
+      return padd_d;
+
+end to_padd_d;
 
 end package body;

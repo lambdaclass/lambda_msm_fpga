@@ -11,7 +11,7 @@ entity FSM_padd_counter is
         port(
         clk, rst        : in std_logic;
 
-        add_count       : in std_logic; -- Dejo la senial prendida hasta que termine
+        add_count       : in std_logic;
         sub_count       : in std_logic;
 
         out_count       : out std_logic_vector(ceil2power(55) - 1 downto 0);
@@ -25,39 +25,32 @@ architecture Structural of FSM_padd_counter is
 
 begin
 
-        process(clk, rst, counter)
+        process(clk, rst, counter, top_v)
         begin
                 if(rst = '1') then
                         counter <= (others => '0');
-                        top_v <= '0';
+                        top_v <= '1';
                 elsif(clk'event and clk = '1' ) then 
 
                         if (add_count = '1') then
                                 if (sub_count = '1') then
                                         counter <= counter;
-                                        top_v <= top_v;
-                                elsif (counter = K - 1) then
-                                        counter <= counter + 1;
-                                        top_v <= '1';
-                                elsif (counter = K) then
-                                        counter <= (others => '0');
-                                        top_v <= '0';
                                 else
-                                        counter <= counter + 1;
-                                        top_v <= '0';
+                                        counter <= counter + 1 when counter < to_unsigned(55, ceil2power(55)) else
+                                                   counter;
                                 end if;
                         else
                                 if (sub_count = '1') then
-                                        counter <= to_unsigned(0, ceil2power(55)) when counter /= to_unsigned(0, ceil2power(55)) else
-                                                   counter - 1;
-                                        top_v <= '0';
+                                        counter <= counter - 1 when counter > to_unsigned(0, ceil2power(55)) else
+                                                   counter;
                                 else
                                         counter <= counter;
-                                        top_v <= top_v;
                                 end if;
                         end if;
-
                 end if;
+
+                top_v <= '1' when (counter = to_unsigned(0, ceil2power(55))) else 
+                         '0';
         end process;
 
         out_count <= std_logic_vector(counter);

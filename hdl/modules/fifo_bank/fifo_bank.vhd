@@ -19,14 +19,15 @@ entity fifo_bank is
         clk     : in std_logic;
         rst     : in std_logic;
         din     : in std_logic_vector(DWIDTH-1 downto 0);
-        kw      : in std_logic_vector(ceil2power(K)-1 downto 0);
+        kv      : in std_logic_vector(ceil2power(K)-1 downto 0);
         we      : in std_logic;
-        kr      : in std_logic_vector(ceil2power(K)-1 downto 0);
         re      : in std_logic;
 
         dout    : out std_logic_vector(DWIDTH-1 downto 0);
-        empty_o : out std_logic_vector(K-1 downto 0);
-        full_o  : out std_logic_vector(K-1 downto 0)
+
+        empty_dispatch_o : out std_logic_vector(K-1 downto 0);
+        bank_full  : out std_logic;
+        bank_empty : out std_logic
     );
 end entity;
 
@@ -36,14 +37,17 @@ architecture rtl of fifo_bank is
     signal dout_k   : out_bus(K-1 downto 0);
     signal we_k     : std_logic_vector(K-1 downto 0);
 
+    signal k_d     : std_logic_vector(ceil2power(K) - 1 downto 0);
+
     signal empty_o_tmp          : std_logic_vector(K-1 downto 0);
-    signal empty_delay_flag     : std_logic;
+    signal full_o_tmp           : std_logic_vector(K-1 downto 0);
+    signal empty_o_reg          : std_logic_vector(K-1 downto 0);
 begin
 
-    U1A_WEA_DECODER: process(kw, we)
+    U1A_WEA_DECODER: process(kv, we)
     begin
         we_k <= (others => '0');   -- default
-        we_k(to_integer(unsigned(kw))) <= we;
+        we_k(to_integer(unsigned(kv))) <= we;
     end process;
 
     U_FIFO_BANK: for i in 0 to K-1 generate
@@ -78,7 +82,7 @@ begin
             dbiterr         => open,
             dout            => dout_k(i),
             empty           => empty_o_tmp(i),
-            full            => full_o(i),
+            full            => full_o_tmp(i),
             overflow        => open,
             prog_empty      => open,
             prog_full       => open,
@@ -92,7 +96,7 @@ begin
             din             => din,
             injectdbiterr   => '0',
             injectsbiterr   => '0',
-            rd_en           => re,
+            rd_en           => not empty_o_tmp(i) and re,
             rst             => rst,
             sleep           => '0',
             wr_clk          => clk,
@@ -100,24 +104,37 @@ begin
         );
     end generate;
 
-    empty_delay_flag <= clk and re;
+    EMPTY_FLAGS: process(clk, rst, re)
+    begin 
+        if rst = '1' then 
+                empty_o_reg <= (others => '0');
+        else
+                if rising_edge(clk) then 
+                        if re = '1' then 
+                                empty_o_reg <= empty_o_tmp;                
+                        else 
+                                empty_o_reg <= empty_o_reg;                
+                        end if;
+                end if;
+        end if;
+    end process;
 
-    EMPTY_FLAGS_DELAY: entity work.delay_1
-    generic map(
-    WORD_WIDTH => K
-               )
-    port map(
-        clk => empty_delay_flag,
-        rst => rst, 
+    empty_dispatch_o <= empty_o_reg;
 
-        s => empty_o_tmp,
-        s_delayed => empty_o
-                );
+    -- Genera el estado para la FSM
+    bank_empty <= or (not empty_o_tmp);
+    bank_full  <= or full_o_tmp;
 
-
-    U2A_DOUT_MUX: process(kr, dout_k)
+    K_DELAY_PROC: process(clk)
     begin
-        dout <= dout_k(to_integer(unsigned(kr)));
+        if rising_edge(clk) then
+                k_d <= kv;
+        end if;
+    end process;
+
+    U2A_DOUT_MUX: process(k_d, dout_k)
+    begin
+        dout <= dout_k(to_integer(unsigned(k_d)));
     end process;
 
 end architecture;
