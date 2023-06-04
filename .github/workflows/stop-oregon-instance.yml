@@ -1,0 +1,16 @@
+name: "Stop FPGA instance (Oregon: 54.190.134.58)"
+on:
+  workflow_dispatch:
+
+jobs:
+  stop-fpga-instance:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: us-west-2
+
+    steps:
+      - name: Stop FPGA instance
+        run: |
+          aws ec2 stop-instances --instance-ids i-04779937ff9107c15
