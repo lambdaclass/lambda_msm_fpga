@@ -50,11 +50,11 @@ architecture structural of mod_mul is
     -- m = (2^(k+N_vect))//q
     constant m : unsigned(N_vect downto 0) := "10" & x"61508d0cc4060e976c3ca0582ef4f73bbad0de6776b1a06af2d488d85a6d02d0ed687789c42a591f9fd58c5e4daffc";
     
-    -- Dor debugging:
+    -- For debugging:
     -- constant m : unsigned(N_vect downto 0) := '1' & x"05";
 
-    attribute use_dsp : string;
-    attribute use_dsp of l1_int : signal is "no";
+    -- attribute use_dsp : string;
+    -- attribute use_dsp of l1_int : signal is "no";
 
 begin
 
@@ -100,14 +100,14 @@ begin
     l1      <= l1_int(2*N_vect-1 downto N_vect);
 
     lq_int <= l1 * q;
-    -- lq_int <= l1 * q;
---    U1_CON_vectST_MULT: entity work.IntConstMult_377
---    port map(
---        clk => clk,
---        X   => std_logic_vector(l1),
---        R   => lq_int
---    );
-    lq     <= unsigned(lq_int(N_vect+1 downto 0));
+    -- Flopoco:
+--  U1_CON_vectST_MULT: entity work.IntConstMult_377
+--  port map(
+--      clk => clk,
+--      X   => std_logic_vector(l1),
+--      R   => lq_int
+--  );
+    lq    <= unsigned(lq_int(N_vect+1 downto 0));
 
     r_int <= unsigned(mult_lo) - lq;
 
